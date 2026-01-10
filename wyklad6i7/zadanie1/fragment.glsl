@@ -1,55 +1,60 @@
 #version 330 core
-in vec3 vNormal;
-in vec3 vFragPos;
-in vec2 vTexCoord;
-
 out vec4 FragColor;
 
+struct Material {
+    float ambient;
+    float diffuse;
+    float specular;
+    float shininess;
+};
+
+in vec2 TexCoord;
+in vec3 Normal;
+in vec3 FragPos;
+
 uniform vec3 uColor;
-uniform sampler2D uTextureSampler; 
-uniform int bUseTexture; // 1: Użyj tekstury (może być alpha/discard), 0: Użyj uColor
+uniform sampler2D uTextureSampler;
+uniform bool bUseTexture;
 
-void main()
-{
-    // 1. Oświetlenie (Prosty Ambient + Diffuse)
-    vec3 lightPos = vec3(5.0, 5.0, 5.0);
-    vec3 lightColor = vec3(1.0, 1.0, 1.0);
+uniform vec3 lightPos;
+uniform vec3 viewPos;
+uniform bool useLighting;
+uniform bool useBlinnPhong;
+uniform Material material;
+
+void main() {
+    vec3 baseColor = bUseTexture ? texture(uTextureSampler, TexCoord).rgb : uColor;
     
-    // Ambient
-    vec3 ambient = 0.2 * lightColor;
-    
-    // Diffuse
-    vec3 norm = normalize(vNormal);
-    vec3 lightDir = normalize(lightPos - vFragPos);
+    if(!useLighting) {
+        FragColor = vec4(baseColor, 1.0);
+        return;
+    }
+
+    // 1. Ambient
+    vec3 ambient = material.ambient * baseColor;
+
+    // 2. Diffuse
+    vec3 norm = normalize(Normal);
+    vec3 lightDir = normalize(lightPos - FragPos);
     float diff = max(dot(norm, lightDir), 0.0);
-    vec3 diffuse = diff * lightColor;
+    vec3 diffuse = material.diffuse * diff * baseColor;
 
-    // 2. Kolor Obiektu (Kolor czy Tekstura + Logika Kwiatu/Alpha)
-    vec4 finalObjectColor;
+    // 3. Specular
+    vec3 viewDir = normalize(viewPos - FragPos);
+    float spec = 0.0;
     
-    if (bUseTexture == 1)
-    {
-        // Mamy teksturę - pobieramy z niej kolor i kanał alpha
-        vec4 texColor = texture(uTextureSampler, vTexCoord);
-        
-        // discard jesli jest za maly piksel 
-        if (texColor.a < 0.1) {
-            discard;
-        }
-        
-        // Używamy koloru z tekstury
-        finalObjectColor = texColor;
-    }
-    else
-    {
-        // bez alpha discard
-        finalObjectColor = vec4(uColor, 1.0);
+    if(useBlinnPhong) {
+        // Model Blinna-Phonga (Halfway vector)
+        vec3 halfwayDir = normalize(lightDir + viewDir);
+        spec = pow(max(dot(norm, halfwayDir), 0.0), material.shininess);
+    } else {
+        // Model Phonga (Reflection vector)
+        vec3 reflectDir = reflect(-lightDir, norm);
+        spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
     }
     
-    // Finalne Obliczenie Koloru
-    
-    // Wynikowe natężenie światła (Ambient + Diffuse) jest mnożone przez kolor obiektu (RGB)
-    vec3 resultRGB = (ambient + diffuse) * finalObjectColor.rgb;
-    
-    FragColor = vec4(resultRGB, finalObjectColor.a); 
+    vec3 specular = material.specular * spec * vec3(1.0); // Białe odbicie
+
+    vec3 result = ambient + diffuse + specular;
+    FragColor = vec4(result, 1.0);
 }
