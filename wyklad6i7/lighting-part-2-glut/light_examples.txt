@@ -1,0 +1,87 @@
+// ----------------------------------------------
+// Przykladowe dane do modelu oswietlenia
+// ----------------------------------------------
+
+
+
+
+// ----------------------------------------------
+// (1) SWIATLO
+// ----------------------------------------------
+
+// Struktura oswietlenia punktowego
+struct LightParam
+{
+	vec3 Ambient;
+	vec3 Diffuse;
+	vec3 Specular;
+	vec3 Attenuation;
+	vec3 Position; // Direction dla kierunkowego
+};
+
+// Przykladowe swiatlo punktowe
+LightParam myLight = LightParam
+(
+	vec3 (0.1 , 0.1 , 0.1), // ambient
+	vec3 (1.0 , 1.0 , 1.0), // diffuse
+	vec3 (1.0 , 1.0 , 1.0), // specular
+	vec3 (1.0 , 0.0 , 0.0), // attenuation
+	vec3 (2.0 , 3.0 , 1.0)  // position
+);
+
+
+
+// ----------------------------------------------
+// (2) MATERIAL
+// ----------------------------------------------
+
+// Struktura materialu obiektu
+struct MaterialParam
+{
+	vec3 Ambient;
+	vec3 Diffuse;
+	vec3 Specular;
+	float Shininess;
+};
+
+// Przykladowy material
+MaterialParam myMaterial = MaterialParam
+(
+	vec3 (0.2 , 0.2 , 0.2), // ambient
+	vec3 (1.0 , 1.0 , 1.0), // diffuse
+	vec3 (1.0 , 1.0 , 1.0), // specular
+	32.0 // shininess
+);
+
+
+// ----------------------------------------------
+// OSWIETLENIE PUNKTOWE
+// ----------------------------------------------
+
+// Funkcja liczaca wspolczynnik oswietlenia punktowego
+vec3 calculatePointLight(MaterialParam myMaterial, LightParam myLight)
+{
+
+	// Skladowa tlumienia
+	float LV = length( myLight.Position - inPosition.xyz );
+	float Latt = 1.0/( myLight.Attenuation.x + myLight.Attenuation.y * LV + myLight.Attenuation.z * LV * LV );
+
+	// Ambient part
+	vec3 ambient = myLight.Ambient * myMaterial.Ambient;
+
+	// Diffuse part
+	vec3 L = normalize(myLight.Position - inPosition.xyz);
+	vec3 diffuse = max( dot(L, inNormal ), 0 ) * myLight.Diffuse * myMaterial.Diffuse;
+
+	// Specular part
+	vec3 E = normalize(cameraPosition - inPosition.xyz);
+	vec3 H = normalize(L + E);
+	float specCoef = pow(max(dot(H, inNormal), 0.0), myMaterial.Shininess);
+	vec3 specular = specCoef * myLight.Specular * myMaterial.Specular;
+
+	vec3 lightCoef = ambient + Latt * ( diffuse + specular);
+
+	return lightCoef;
+}
+
+	

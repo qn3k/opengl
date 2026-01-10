@@ -1,0 +1,1 @@
+g++ main.cpp glad.c ImGui\*.cpp -lglfw3 -lopengl32 -lgdi32

@@ -1,0 +1,57 @@
+// ----------------------------------------------------------
+// Prosta obsluga bledow w OpenGL
+// ----------------------------------------------------------
+
+// Nastepujacy kod sprawdza stan maszyny opengla 
+// pod katem wystepowania ewentualnego bledu.
+
+GLenum errCode;
+const GLubyte *errString;
+
+if ((errCode = glGetError()) != GL_NO_ERROR)
+{
+	errString = gluErrorString(errCode);
+	printf("OpenGL Error (%d): %s\n", errCode, errString);
+}
+
+// Mozesz ten kod wkleic w dowolne miejsce, np. w funkcji 
+// DisplayScene() lub na koniec Initialize();
+// Uwaga: wywolanie funkcji glGetError() zwraca ostatnio
+// wystepujacy blad a nastepnie czysci stan bledu maszyny
+// opengla.
+
+// UWAGA! Makro potrzebuje dodania biblioteki GLU
+// Mozemy ja dodac opcja -lglu32 podczas kompilacji
+
+
+
+// ----------------------------------------------------------
+// Makro do wypisywania bledow
+// ----------------------------------------------------------
+
+// Wpisz nastepujace makro w swoim projekcie
+
+#define __CHECK_FOR_ERRORS 	{GLenum errCode; if ((errCode = glGetError()) != GL_NO_ERROR) printf("Error (%d): %s in file %s at line %d !\n", errCode, gluErrorString(errCode), __FILE__,  __LINE__);}
+
+// Nastepnie wywolaj je np. w funkcji DisplayScene()
+
+__CHECK_FOR_ERRORS
+
+// Jesli w miejscu wywolania makra maszyna stanow opengla 
+// zawierala kod bledu, pojawi nam sie komunikat o nim.
+// Jesli nie, to nic nie zostanie wypisane na ekranie.
+
+// Mozesz to makro wywolac w wielu miejscach projektu, 
+// w szczegolnosci pomiedzy interesujacymi poleceniami
+// opengla, aby zlokalizowac precyzyjnie ktora komenda
+// opengla zwraca blad. Np.:
+
+__CHECK_FOR_ERRORS
+
+polecenieAOpenGL();
+
+__CHECK_FOR_ERRORS
+
+polecenieBOpenGL();
+
+__CHECK_FOR_ERRORS

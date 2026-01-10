@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="szablon-glfw-ImGui" />
+		<Option pch_mode="2" />
+		<Option compiler="gcc" />
+		<Build>
+			<Target title="Debug">
+				<Option output="bin/Debug/glfw-ImGui" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj/" />
+				<Option type="1" />
+				<Option compiler="gcc" />
+				<Compiler>
+					<Add option="-g" />
+				</Compiler>
+			</Target>
+			<Target title="Release">
+				<Option output="bin/Release/glfw-ImGui" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj/Release/" />
+				<Option type="1" />
+				<Option compiler="gcc" />
+				<Compiler>
+					<Add option="-O2" />
+				</Compiler>
+				<Linker>
+					<Add option="-s" />
+				</Linker>
+			</Target>
+		</Build>
+		<Compiler>
+			<Add option="-Wall" />
+		</Compiler>
+		<Linker>
+			<Add option="-lglfw3 -lgdi32 -lopengl32" />
+		</Linker>
+		<Unit filename="ImGui/imconfig.h" />
+		<Unit filename="ImGui/imgui.cpp" />
+		<Unit filename="ImGui/imgui.h" />
+		<Unit filename="ImGui/imgui_demo.cpp" />
+		<Unit filename="ImGui/imgui_draw.cpp" />
+		<Unit filename="ImGui/imgui_impl_glfw.cpp" />
+		<Unit filename="ImGui/imgui_impl_glfw.h" />
+		<Unit filename="ImGui/imgui_impl_opengl3.cpp" />
+		<Unit filename="ImGui/imgui_impl_opengl3.h" />
+		<Unit filename="ImGui/imgui_impl_opengl3_loader.h" />
+		<Unit filename="ImGui/imgui_internal.h" />
+		<Unit filename="ImGui/imgui_tables.cpp" />
+		<Unit filename="ImGui/imgui_widgets.cpp" />
+		<Unit filename="ImGui/imstb_rectpack.h" />
+		<Unit filename="ImGui/imstb_textedit.h" />
+		<Unit filename="ImGui/imstb_truetype.h" />
+		<Unit filename="glad.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="main.cpp" />
+		<Unit filename="myImGui.hpp" />
+		<Unit filename="objloader.hpp" />
+		<Unit filename="shaders/fragment.glsl" />
+		<Unit filename="shaders/vertex.glsl" />
+		<Unit filename="utilities.hpp" />
+		<Extensions>
+			<lib_finder disable_auto="1" />
+		</Extensions>
+	</Project>
+</CodeBlocks_project_file>

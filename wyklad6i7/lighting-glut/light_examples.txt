@@ -1,0 +1,87 @@
+// ----------------------------------------------
+// Przykladowe dane do modelu oswietlenia
+// ----------------------------------------------
+
+
+
+
+// ----------------------------------------------
+// (1) SWIATLO
+// ----------------------------------------------
+
+// Struktura oswietlenia punktowego
+struct LightParam
+{
+	vec3 Ambient;
+	vec3 Diffuse;
+	vec3 Specular;
+	vec3 Attenuation;
+	vec3 Position; // Direction dla kierunkowego
+};
+
+// Przykladowe swiatlo punktowe
+LightParam myLight = LightParam
+(
+	vec3 (0.1 , 0.1 , 0.1), // ambient
+	vec3 (1.0 , 1.0 , 1.0), // diffuse
+	vec3 (1.0 , 1.0 , 1.0), // specular
+	vec3 (1.0 , 0.0 , 0.0), // attenuation
+	vec3 (2.0 , 3.0 , 1.0)  // position
+);
+
+
+
+// ----------------------------------------------
+// (2) MATERIAL
+// ----------------------------------------------
+
+// Struktura materialu obiektu
+struct MaterialParam
+{
+	vec3 Ambient;
+	vec3 Diffuse;
+	vec3 Specular;
+	float Shininess;
+};
+
+// Przykladowy material
+MaterialParam myMaterial = MaterialParam
+(
+	vec3 (0.2 , 0.2 , 0.2), // ambient
+	vec3 (1.0 , 1.0 , 1.0), // diffuse
+	vec3 (1.0 , 1.0 , 1.0), // specular
+	32.0 // shininess
+);
+
+
+// ----------------------------------------------
+// OSWIETLENIE PUNKTOWE
+// ----------------------------------------------
+
+// Funkcja liczaca wspolczynnik oswietlenia punktowego
+vec3 calculatePointLight(vec3 Position, vec3 Normal, vec3 CameraPos, LightParam light, MaterialParam material)
+{
+
+	// 1. Czesc ambientowa
+    vec3 ambientPart = light.Ambient * material.Ambient;
+	
+	// 2. Czesc rozproszeniowa
+    vec3 L = normalize(light.Position - Position);
+    float diff = max(dot(L, Normal), 0);
+    vec3 diffusePart = diff * light.Diffuse * material.Diffuse;
+
+	// 3. Czesc odblaskowa
+    vec3 E = normalize(CameraPos - Position);
+    vec3 R = reflect(-E, Normal);
+    float spec = pow(max(dot(R,L), 0), material.Shininess);
+    vec3 specularPart = spec * light.Specular * material.Specular;
+	
+	// Wspolczynnik tlumienia
+    float LV = distance(Position, light.Position);
+    float latt = 1.0 / (light.Attenuation.x + light.Attenuation.y * LV + light.Attenuation.z * LV * LV);
+
+	// Ostateczny wzor na wspolczynnik oswietlenia
+    return ambientPart + latt * (diffusePart + specularPart);
+}
+
+	
