@@ -16,6 +16,9 @@
 glm::mat4 matProj;
 glm::vec3 lightColor = glm::vec3(1.0f, 1.0f, 1.0f); // Domyślnie białe
 
+#include "imgui.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_opengl3.h"
 #include "utilities.hpp" 
 #include "objloader.hpp" 
 
@@ -27,6 +30,16 @@ float lightOrbitSpeed = 1.0f; // Prędkość obrotu
 bool showLightSource = true; // Czy pokazywać "żarówkę"
 bool isPointLight = true; // true = Punktowe, false = Kierunkowe
 glm::vec3 dirLightDirection = glm::vec3(-0.2f, -1.0f, -0.3f); // Światło padające z góry pod skosem
+
+// --- STRUKTURA ŚWIATŁA ---
+struct PointLight {
+    glm::vec3 position;
+    glm::vec3 color;
+    float intensity;
+};
+
+PointLight lights[4];
+int activeLightsCount = 1; // Startujemy z jednym światłem
 
 // --- STRUKTURA MATERIAŁU I OBIEKTU ---
 struct Material {
@@ -172,6 +185,7 @@ GLuint LoadTexture(const char* path) {
 }
 
 void Initialize() {
+
     glClearColor(0.1f, 0.1f, 0.1f, 1.0f); 
     glEnable(GL_DEPTH_TEST);
     
@@ -287,9 +301,74 @@ void Initialize() {
     matProj = glm::perspective(glm::radians(80.0f), windowWidth/(float)windowHeight, 0.1f, 50.0f);
 }
 
+void SetupLights() {
+    // Światło 1: Białe (krążące - to co już masz)
+    lights[0] = { glm::vec3(0, 3, 0), glm::vec3(1.0, 1.0, 1.0), 1.5f };
+    // Światło 2: Czerwone (stałe)
+    lights[1] = { glm::vec3(-4, 2, -4), glm::vec3(1.0, 0.0, 0.0), 1.2f };
+    // Światło 3: Zielone (stałe)
+    lights[2] = { glm::vec3(4, 2, -4), glm::vec3(0.0, 1.0, 0.0), 1.2f };
+    // Światło 4: Niebieskie (stałe)
+    lights[3] = { glm::vec3(0, 2, 4), glm::vec3(0.0, 0.0, 1.0), 1.2f };
+}
+
 void DisplayScene() {
+    // --- START IMGUI FRAME ---
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+
+    // --- OKNO KONTROLNE ---
+    ImGui::Begin("Lighting Controller");
+
+    if (ImGui::CollapsingHeader("Global Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::Checkbox("Use Lighting (F1/F2)", &useLighting);
+        ImGui::Checkbox("Blinn-Phong Model (P/B)", &useBlinnPhong);
+        ImGui::Checkbox("Animate Lights (M)", &animateLight);
+        ImGui::Checkbox("Show Light Sources (G)", &showLightSource);
+        ImGui::SliderFloat("Orbit Speed", &lightOrbitSpeed, 0.0f, 5.0f);
+    }
+
+    if (ImGui::CollapsingHeader("Light Type", ImGuiTreeNodeFlags_DefaultOpen)) {
+        if (ImGui::RadioButton("Point Light", isPointLight)) isPointLight = true;
+        ImGui::SameLine();
+        if (ImGui::RadioButton("Directional Light", !isPointLight)) isPointLight = false;
+        
+        if (!isPointLight) {
+            ImGui::SliderFloat3("Direction", glm::value_ptr(dirLightDirection), -1.0f, 1.0f);
+        }
+    }
+
+    if (ImGui::CollapsingHeader("Multi-Light (N)", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::SliderInt("Active Lights", &activeLightsCount, 1, 4);
+        
+        for (int i = 0; i < activeLightsCount; i++) {
+            ImGui::PushID(i);
+            char buf[32];
+            sprintf(buf, "Light %d", i + 1);
+            if (ImGui::TreeNode(buf)) {
+                ImGui::ColorEdit3("Color", glm::value_ptr(lights[i].color));
+                ImGui::SliderFloat("Intensity", &lights[i].intensity, 0.0f, 5.0f);
+                ImGui::TreePop();
+            }
+            ImGui::PopID();
+        }
+    }
+
+    ImGui::End();
+
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glUseProgram(idProgram);
+
+    // 1. Najpierw aktualizujemy pozycje (Animacja)
+    float time = (float)glfwGetTime();
+    for (int i = 0; i < 4; i++) {
+        if (animateLight) {
+            float angle = time * lightOrbitSpeed + (i * 1.57f);
+            float radius = 4.0f + i;
+            lights[i].position = glm::vec3(sin(angle) * radius, 2.5f, cos(angle) * radius);
+        }
+    }
 
     static float lightAngle = 0.0f;
     if (animateLight) lightAngle = (float)glfwGetTime() * lightOrbitSpeed;
@@ -308,8 +387,24 @@ void DisplayScene() {
     glUniform1i(glGetUniformLocation(idProgram, "useLighting"), useLighting);
     glUniform1i(glGetUniformLocation(idProgram, "useBlinnPhong"), useBlinnPhong);
     glUniform1i(glGetUniformLocation(idProgram, "bIsLightSource"), false);
-    glUniform1i(glGetUniformLocation(idProgram, "isPointLight"), isPointLight);
     glUniform3fv(glGetUniformLocation(idProgram, "dirLightDirection"), 1, glm::value_ptr(dirLightDirection));
+    glUniform1i(glGetUniformLocation(idProgram, "isPointLight"), isPointLight);
+    glUniform1i(glGetUniformLocation(idProgram, "activeLightsCount"), activeLightsCount);
+
+    // PRZESYŁANIE TABLICY ŚWIATEŁ PUNKTOWYCH
+    for (int i = 0; i < 4; i++) {
+        std::string base = "lights[" + std::to_string(i) + "]";
+        
+        // Ustawiamy kolory świateł na podstawie globalnego lightColor, 
+        // aby klawisze 1-4 nadal działały na główne światło
+        if(i == 0) lights[i].color = lightColor; 
+
+        glUniform3fv(glGetUniformLocation(idProgram, (base + ".position").c_str()), 1, glm::value_ptr(lights[i].position));
+        glUniform3fv(glGetUniformLocation(idProgram, (base + ".color").c_str()), 1, glm::value_ptr(lights[i].color));
+        glUniform1f(glGetUniformLocation(idProgram, (base + ".intensity").c_str()), lights[i].intensity);
+    }
+
+
 
     GLint loc_bUseTexture = glGetUniformLocation(idProgram, "bUseTexture");
 
@@ -344,19 +439,23 @@ void DisplayScene() {
 
     //RYSOWANIE "ŻARÓWKI" (klawisz G)
     if (showLightSource && isPointLight) {
-        glm::mat4 matLight = glm::translate(glm::mat4(1.0), currentLightPos);
-        matLight = glm::scale(matLight, glm::vec3(0.2f)); // Mała sfera
-
-        // Włączamy flagę w shaderze - to sprawi, że sfera będzie świecić własnym kolorem
         glUniform1i(glGetUniformLocation(idProgram, "bIsLightSource"), true);
-        glUniformMatrix4fv(glGetUniformLocation(idProgram, "matModel"), 1, GL_FALSE, glm::value_ptr(matLight));
         
-        // Rysujemy sferę (indeks 2 w Twoim wektorze meshes)
-        meshes[2].Draw();
-
-        // Resetujemy flagę dla bezpieczeństwa
+        for (int i = 0; i < activeLightsCount; i++) {
+            glm::mat4 matLight = glm::translate(glm::mat4(1.0), lights[i].position);
+            matLight = glm::scale(matLight, glm::vec3(0.15f));
+            
+            // Przesyłamy kolor konkretnej żarówki do shadera, żeby sferka świeciła na swój kolor
+            glUniform3fv(glGetUniformLocation(idProgram, "lightColor"), 1, glm::value_ptr(lights[i].color));
+            glUniformMatrix4fv(glGetUniformLocation(idProgram, "matModel"), 1, GL_FALSE, glm::value_ptr(matLight));
+            
+            meshes[2].Draw(); // Rysuj sferę
+        }
         glUniform1i(glGetUniformLocation(idProgram, "bIsLightSource"), false);
     }
+
+    ImGui::Render();
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
 // Nadpisujemy key_callback
@@ -393,6 +492,12 @@ void my_key_callback(GLFWwindow* window, int key, int scancode, int action, int 
             isPointLight = !isPointLight;
             printf("Typ oswietlenia (H): %s\n", isPointLight ? "PUNKTOWE" : "KIERUNKOWE");
         }
+
+        if (key == GLFW_KEY_N && action == GLFW_PRESS) {
+            activeLightsCount++;
+            if (activeLightsCount > 4) activeLightsCount = 1;
+            printf("Liczba aktywnych swiatel: %d\n", activeLightsCount);
+        }
         
         // Kolory światła
         if (key == GLFW_KEY_1) { lightColor = glm::vec3(1.0, 1.0, 1.0); } // White
@@ -412,6 +517,14 @@ int main() {
     glfwMakeContextCurrent(window);
     gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
 
+    // Setup Dear ImGui context
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+
+    // Setup Style
+    ImGui::StyleColorsDark();
+
     // Rejestracja callbacków z utilities.hpp
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
     glfwSetScrollCallback(window, scroll_callback);
@@ -419,14 +532,22 @@ int main() {
     glfwSetMouseButtonCallback(window, mouse_button_callback);
     glfwSetKeyCallback(window, my_key_callback);
 
-    Initialize();
+    // Setup Platform/Renderer backends
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init("#version 330");
 
+    Initialize();
+    SetupLights();
+    
     while (!glfwWindowShouldClose(window)) {
         DisplayScene();
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
 
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
     for(auto& m : meshes) m.Release();
     glfwTerminate();
     return 0;

@@ -1,13 +1,10 @@
 #version 330 core
-
 out vec4 FragColor;
 
-// Dane z Vertex Shadera
 in vec3 FragPos;
 in vec3 Normal;
 in vec2 TexCoords;
 
-// Struktura materiału obiektu
 struct Material {
     float ambient;
     float diffuse;
@@ -15,19 +12,18 @@ struct Material {
     float shininess;
 };
 
-// Uniformy oświetlenia
 uniform vec3 lightPos;
+uniform vec3 dirLightDirection; // Kierunek światła słonecznego
 uniform vec3 viewPos;
-uniform vec3 lightColor; 
+uniform vec3 lightColor;
 uniform bool useLighting;
 uniform bool useBlinnPhong;
-uniform bool bIsLightSource; 
+uniform bool isPointLight;      // Flaga wyboru typu światła
+uniform bool bIsLightSource;
 
-// Uniformy tekstur i koloru obiektu
 uniform sampler2D uTextureSampler;
 uniform bool bUseTexture;
 uniform vec3 uColor;
-
 uniform Material material;
 
 void main()
@@ -37,44 +33,47 @@ void main()
         return;
     }
 
-    // 1. USTALENIE BAZOWEGO KOLORU OBIEKTU
-    vec4 baseColor;
-    if(bUseTexture) {
-        baseColor = texture(uTextureSampler, TexCoords);
-        if(baseColor.a < 0.1) discard; 
-    } else {
-        baseColor = vec4(uColor, 1.0);
-    }
+    vec4 baseColor = bUseTexture ? texture(uTextureSampler, TexCoords) : vec4(uColor, 1.0);
+    if(baseColor.a < 0.1) discard;
 
-    // Jeśli oświetlenie wyłączone (F1), zwróć czysty kolor
     if(!useLighting) {
         FragColor = baseColor;
         return;
     }
 
-    // --- PARAMETR MOCY ŚWIATŁA ---
-    float lightIntensity = 1.8; // Zwiększone dla lepszego efektu
+    float lightIntensity;
+    if(isPointLight) {
+        lightIntensity = 1.5; // Punktowe zostaje mocne
+    } else {
+        lightIntensity = 1; // Kierunkowe osłabiamy 
+    }
     vec3 effectiveLightColor = lightColor * lightIntensity;
-
-    // 2. OBLICZENIA OŚWIETLENIA
     vec3 norm = normalize(Normal);
-    vec3 lightDir = normalize(lightPos - FragPos);
     vec3 viewDir = normalize(viewPos - FragPos);
     
-    // Obliczanie odległości dla tłumienia (Attenuation)
-    float distance = length(lightPos - FragPos);
-    // Wzór na tłumienie (stała, liniowa, kwadratowa)
-    // Dopasowane do promienia ok. 20-30 jednostek
-    float attenuation = 1.0 / (1.0 + 0.07 * distance + 0.017 * (distance * distance));
+    // --- OBLICZANIE KIERUNKU ŚWIATŁA ---
+    vec3 lightDir;
+    float attenuation = 1.0;
 
-    // AMBIENT (Światło otoczenia - lekko tłumione, by zachować głębię)
+    if(isPointLight) {
+        // Światło punktowe
+        lightDir = normalize(lightPos - FragPos);
+        float distance = length(lightPos - FragPos);
+        attenuation = 1.0 / (1.0 + 0.07 * distance + 0.017 * (distance * distance));
+    } else {
+        // Światło kierunkowe (odwracamy kierunek, bo potrzebujemy wektora DO światła)
+        lightDir = normalize(-dirLightDirection);
+        attenuation = 1.0; // Światło kierunkowe nie słabnie wraz z odległością
+    }
+
+    // AMBIENT
     vec3 ambient = material.ambient * effectiveLightColor * baseColor.rgb;
 
-    // DIFFUSE (Lambert)
+    // DIFFUSE
     float diff = max(dot(norm, lightDir), 0.0);
     vec3 diffuse = (material.diffuse * diff) * effectiveLightColor * baseColor.rgb;
 
-    // SPECULAR (Błysk)
+    // SPECULAR
     float spec = 0.0;
     if(useBlinnPhong) {
         vec3 halfwayDir = normalize(lightDir + viewDir);
@@ -85,8 +84,7 @@ void main()
     }
     vec3 specular = (material.specular * spec) * effectiveLightColor;
 
-    // 3. SKŁADANIE FINALNEGO PIKSELA
-    // Tłumienie nakładamy na Diffuse i Specular (Ambient zazwyczaj jest stały)
+    // SKŁADANIE (Tłumienie tylko dla punktowego)
     vec3 result = ambient + (diffuse + specular) * attenuation;
 
     FragColor = vec4(result, baseColor.a);
