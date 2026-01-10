@@ -199,40 +199,23 @@ unsigned long getFileLength(const char *filename)
 
 
 // ---------------------------------------------
-GLchar * LoadShaderFile(const char* filename)
-{
-	FILE *file = fopen(filename, "r");
-	if (file == NULL) {
-		fprintf(stderr, "Nie moge otworzyc pliku %s!\n", filename);
-		exit(1);
-	}
+GLchar* LoadShaderFile(const char* filename) {
+    FILE* file = fopen(filename, "rb"); // Tryb binarny jest bezpieczniejszy
+    if (file == NULL) {
+        fprintf(stderr, "Nie mozna otworzyc: %s\n", filename);
+        exit(1);
+    }
 
-	unsigned long fileSize;
+    fseek(file, 0, SEEK_END);
+    unsigned long fileSize = ftell(file);
+    fseek(file, 0, SEEK_SET);
 
-	fseek(file, 0, SEEK_END);
-	fileSize = ftell(file);
-	fseek(file, 0, SEEK_SET);
+    GLchar* ShaderSource = new GLchar[fileSize + 1];
+    fread(ShaderSource, 1, fileSize, file);
+    ShaderSource[fileSize] = '\0'; // Ręczne zamknięcie stringa
 
-	if (fileSize == 0) {
-		printf("Plik %s jest pusty!\n", filename);
-		exit(1);
-	};
-
-	GLchar *ShaderSource = new GLchar[fileSize + 1];
-	if (ShaderSource == NULL) {
-		printf("Nie moge zaalokowac %ld bajtow \n", fileSize + 1);
-		exit(1);
-	}
-
-	int bytesRead = 0;
-	char c;
-	while ((c = fgetc(file)) != EOF && bytesRead < fileSize - 1) {
-		ShaderSource[bytesRead++] = c;
-	}
-	ShaderSource[bytesRead] = '\0';
-
-	fclose(file);
-	return ShaderSource;
+    fclose(file);
+    return ShaderSource;
 }
 
 // ---------------------------------------
