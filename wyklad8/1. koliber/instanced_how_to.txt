@@ -1,0 +1,139 @@
+// ---------------------------------------------------
+// I. Instanced Rendering w OpenGL
+// ---------------------------------------------------
+
+Na poziomie aplikacji mamy dwie dodatkowe funkcje do 
+renderowania obiektow za pomoca instancji:
+
+a) glDrawArraysInstanced(GL_TRIANGLES, 0, Liczba_wierzcholkow, LICZBA_INSTANCJI); 
+b) glDrawElementsInstanced(GL_TRIANGLES, Liczba_wierzcholkow, GL_UNSIGNED_INT, NULL, LICZBA_INSTANCJI);
+
+Na poziomie shadera mamy dodatkowa zmienna int gl_InstanceID 
+przechowujaca numer instancji (jest ona predefiniowana, wiec 
+nie trzeba jej ponownie deklarowac
+
+...
+//in int gl_InstanceID;
+
+void main()
+{
+	vec4 newPos = inPosition;
+	newPos.x += gl_InstanceID/100;
+	
+	gl_Position = matProjView * newPos;
+}
+
+
+
+// ---------------------------------------------------
+// II. Przeslanie indywidualnej macierzy modelu dla 
+//     poszczegolnych instancji
+// ---------------------------------------------------
+
+// Zalozenia:
+//
+// Mamy obiekt, ktory chcemy zduplikowac wiele razy
+// i kazdy z nich umiescic w innym miejscu sceny.
+//
+// Polozenie/orientacje kazdego z tych obiektow bedziemy przechowywac
+// w macierzy modelu mat4.
+
+
+// ---------------------------------------
+// 1. Liczba instancji i macierze modelu
+const int Birds_NUMBER = 100;
+glm::mat4 Birds_matModels[Birds_NUMBER];
+
+
+// ---------------------------------------
+// 2. Generowanie losowych macierzy modelu 
+void Birds_Init()
+{
+	for (int i=0; i<Birds_NUMBER; i++)
+	{
+		float x = (rand()/(float)RAND_MAX)*10.0 - 5.0;
+		float y = (rand()/(float)RAND_MAX)*10.0 - 5.0;
+		float z = (rand()/(float)RAND_MAX)*10.0 - 5.0;
+		float a = (rand()/(float)RAND_MAX)*2.0*3.1415; 	// obrot
+		float s = (rand()/(float)RAND_MAX)+0.5; 		// skala
+
+		Birds_matModels[i] = glm::mat4(1.0);
+		Birds_matModels[i] = glm::rotate(Birds_matModels[i], a, glm::vec3(0.0, 1.0, 0.0));
+		Birds_matModels[i] = glm::translate(Birds_matModels[i], glm::vec3(x, y, z));
+		Birds_matModels[i] = glm::scale(Birds_matModels[i], glm::vec3(s, s, s));
+	}
+}
+
+// ---------------------------------------
+// 3. Utworzenie dodatkowego bufora VBO 
+// dla wygenerowanych macierzy modelu
+
+// Uwaga: Przekazujemy macierze 4x4 jako
+// 4 kolejne atrybuty wierzcholka o numerach 
+// 3,4,5,6.
+
+// Najpierw aktywujemy VAO modelu
+glBindVertexArray( idVAO );
+
+	GLuint vInstances;
+	glGenBuffers(1, &vInstances);
+	glBindBuffer(GL_ARRAY_BUFFER, vInstances);
+	glBufferData(GL_ARRAY_BUFFER, Birds_NUMBER * sizeof(glm::mat4), &Birds_matModels[0][0], GL_STATIC_DRAW);
+
+	glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)0);
+	glEnableVertexAttribArray(3);
+	glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(sizeof(glm::vec4)));
+	glEnableVertexAttribArray(4);
+	glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(2 * sizeof(glm::vec4)));
+	glEnableVertexAttribArray(5);
+	glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(3 * sizeof(glm::vec4)));
+	glEnableVertexAttribArray(6);
+
+	// Domyslnie kazda kolejna macierz zostalaby przesłana do kolejnych
+	// wierzcholkow, a chcemy aby jedna ta sama macierz przekazana byla
+	// dla calej instancji.
+	// Ustawiamy w tym celu AttribDivisor na 1 dla kazdego indeksu
+
+	glVertexAttribDivisor(3, 1);
+	glVertexAttribDivisor(4, 1);
+	glVertexAttribDivisor(5, 1);
+	glVertexAttribDivisor(6, 1);
+
+	// Pozostale atrybuty jak wspolrzedne wierzcholkow domyslnie maja ustawione
+	// glVertexAttribDivisor(0, 0);
+	// glVertexAttribDivisor(1, 0); itd.
+
+glBindVertexArray( 0 );
+
+
+// ---------------------------------------
+// 4. Shader wierzcholkow:
+
+#version 330 core
+
+layout( location = 0 ) in vec4 inPosition;
+layout( location = 1 ) in vec2 inUV;
+layout( location = 2 ) in vec3 inNormal;
+// macierz modelu dla calej instancji
+layout( location = 3 ) in mat4 matModelInst;
+
+uniform mat4 matProj;
+uniform mat4 matView;
+
+out vec4 inoutPos;
+out vec2 inoutUV;
+
+
+void main()
+{
+	gl_Position = matProj * matView * matModelInst * inPosition;
+
+	inoutPos = inPosition;
+	inoutUV = inUV;
+}
+
+// ---------------------------------------
+// 5. Renderowanie obiektow na ekranie za 
+// pomoca instancji
+
+glDrawArraysInstanced( GL_TRIANGLES, 0, OBJ_vertices.size(), Birds_NUMBER);

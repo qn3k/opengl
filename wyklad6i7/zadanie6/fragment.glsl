@@ -39,7 +39,7 @@ uniform Material material;
 vec3 CalcPointLight(PointLight light, vec3 norm, vec3 fragPos, vec3 viewDir, vec3 baseColor) {
     vec3 lightDir = normalize(light.position - fragPos);
     
-    // Attenuation
+    // Attenuation - coraz mniej swieci z odlegloscia, w kierunkowym swieci tak samo mocno wszedzie 
     float distance = length(light.position - fragPos);
     float attenuation = 1.0 / (1.0 + 0.07 * distance + 0.017 * (distance * distance));
     
@@ -51,7 +51,7 @@ vec3 CalcPointLight(PointLight light, vec3 norm, vec3 fragPos, vec3 viewDir, vec
     if(useBlinnPhong) {
         vec3 halfwayDir = normalize(lightDir + viewDir);
         spec = pow(max(dot(norm, halfwayDir), 0.0), material.shininess);
-    } else {
+    } else { //tutaj jest Phong
         vec3 reflectDir = reflect(-lightDir, norm);
         spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
     }

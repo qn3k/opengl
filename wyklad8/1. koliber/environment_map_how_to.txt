@@ -1,0 +1,51 @@
+// ---------------------------------------
+// Environment mapping - how to
+// ---------------------------------------
+
+W shaderze fragmentow potrzebujemy: 
+- tekstury skyboxa (uniform samplerCube tex_skybox)
+- pozycji kamery (uniform vec3 cameraPos)
+
+
+
+// ---------------------------------------
+// 1. Odbicie (reflection)
+// ---------------------------------------
+// Fragment shader:
+
+uniform samplerCube tex_skybox;
+...
+
+vec3 Dir = normalize(fragPos - cameraPos);
+vec3 Reflection = reflect(Dir, fragNormal);
+vec3 ReflectionColor = texture(tex_skybox, Reflection).rgb;
+
+
+// ---------------------------------------
+// 2. Refrakcja (refraction)
+// ---------------------------------------
+// Fragment shader:
+
+uniform samplerCube tex_skybox;
+...
+
+float refractionCoeff = 1.0/1.2;
+
+vec3 Dir = normalize(fragPos - cameraPos);
+vec3 Refraction = refract(Dir, fragNormal, refractionCoeff);
+vec3 RefractionColor = texture(tex_skybox, Refraction).rgb;
+
+
+
+// ---------------------------------------
+// 3. Laczenie kolorow
+// ---------------------------------------
+
+Na przyklad:
+
+// kolor pochodzacy z podstawowej tekstury + oswietlenie itp;
+vec3 baseColor = ...
+
+// kolor ostateczny
+vec3 finalColor = baseColor/3.0 + 2.0*ReflectionColor/4.0 + 2.0*RefractionColor/4.0;
+
