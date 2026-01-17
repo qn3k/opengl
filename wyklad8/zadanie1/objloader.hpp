@@ -25,7 +25,7 @@ bool loadOBJ(const char * Filename, std::vector<glm::vec3> & out_coords, std::ve
 
 
 // Implementacja
-bool loadOBJ(const char * Filename, std::vector<glm::vec3> & out_coords, std::vector<glm::vec2> & out_uvs, std::vector<glm::vec3> & out_normals)
+inline bool loadOBJ(const char * Filename, std::vector<glm::vec3> & out_coords, std::vector<glm::vec2> & out_uvs, std::vector<glm::vec3> & out_normals)
 {
 	std::cout << "Loading OBJ file " << Filename << " ...";
 
