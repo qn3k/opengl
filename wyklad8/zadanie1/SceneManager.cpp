@@ -103,10 +103,10 @@ GLuint LoadTexture(const char* path) {
 
 void InitializeResources(std::vector<CMesh>& meshes, std::vector<GLuint>& textures) {
     CMesh mGround, mCube, mSphere, mMonkey, mFlower;
-    mGround.Load("cube.obj"); 
-    mCube.Load("cube.obj");
-    mSphere.Load("sphere.obj");
-    mMonkey.Load("monkey.obj");
+    mGround.Load("obj/cube.obj"); 
+    mCube.Load("obj/cube.obj");
+    mSphere.Load("obj/sphere.obj");
+    mMonkey.Load("obj/monkey.obj");
     mFlower = CMesh::CreateFlowerMesh();
 
     meshes.push_back(mGround); // 0
@@ -116,10 +116,10 @@ void InitializeResources(std::vector<CMesh>& meshes, std::vector<GLuint>& textur
     meshes.push_back(mFlower); // 4
 
     textures.push_back(0); // 0
-    textures.push_back(LoadTexture("grass.png")); 
-    textures.push_back(LoadTexture("metal.png")); 
-    textures.push_back(LoadTexture("brick.png")); 
-    textures.push_back(LoadTexture("flower32bit.png"));
+    textures.push_back(LoadTexture("textures/grass.png")); 
+    textures.push_back(LoadTexture("textures/metal.png")); 
+    textures.push_back(LoadTexture("textures/brick.png")); 
+    textures.push_back(LoadTexture("textures/flower32bit.png"));
 }
 
 void BuildScene(std::vector<SceneObject>& scene, std::vector<CMesh>& meshes, std::vector<GLuint>& textures) {

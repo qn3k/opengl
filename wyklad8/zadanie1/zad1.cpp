@@ -67,8 +67,8 @@ void Initialize() {
 
     // 1. Szadery
     idProgram = glCreateProgram();
-    glAttachShader(idProgram, LoadShader(GL_VERTEX_SHADER, "vertex.glsl"));
-    glAttachShader(idProgram, LoadShader(GL_FRAGMENT_SHADER, "fragment.glsl"));
+    glAttachShader(idProgram, LoadShader(GL_VERTEX_SHADER, "shaders/vertex.glsl"));
+    glAttachShader(idProgram, LoadShader(GL_FRAGMENT_SHADER, "shaders/fragment.glsl"));
     LinkAndValidateProgram(idProgram);
 
     //Przeniesienie ladowania obiektow do zewnetrznych funkcji
