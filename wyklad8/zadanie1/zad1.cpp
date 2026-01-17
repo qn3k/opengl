@@ -34,7 +34,9 @@ float lightOrbitSpeed = 1.0f; // Prędkość obrotu
 bool showLightSource = true; // Czy pokazywać "żarówkę"
 bool isPointLight = true; // true = Punktowe, false = Kierunkowe
 glm::vec3 dirLightDirection = glm::vec3(-0.2f, -1.0f, -0.3f); // Światło padające z góry pod skosem
-Skybox* mySkybox = nullptr;
+Skybox* skybox1 = nullptr;
+Skybox* skybox2 = nullptr;
+int currentSkybox = 0;
 
 // --- STRUKTURA ŚWIATŁA ---
 struct PointLight {
@@ -304,18 +306,12 @@ void Initialize() {
     scene.push_back(flower2);
 
     // Konfiguracja Skyboxa
-    std::vector<std::string> faces = {
-        "skybox/posx.jpg",
-        "skybox/negx.jpg",
-        "skybox/posy.jpg",
-        "skybox/negy.jpg",
-        "skybox/posz.jpg",
-        "skybox/negz.jpg"
-    };
-    
-    // Tworzymy obiekt - upewnij się, że masz te pliki shaderów w folderze shaders/
-    mySkybox = new Skybox(faces, "shaders/skybox-vertex.glsl", "shaders/skybox-fragment.glsl");
+    std::vector<std::string> faces1 = {"skybox1/posx.jpg","skybox1/negx.jpg","skybox1/posy.jpg","skybox1/negy.jpg","skybox1/posz.jpg","skybox1/negz.jpg"};
+    std::vector<std::string> faces2 = {"skybox2/posx.jpg","skybox2/negx.jpg","skybox2/posy.jpg","skybox2/negy.jpg","skybox2/posz.jpg","skybox2/negz.jpg"};
 
+    skybox1 = new Skybox(faces1, "shaders/skybox-vertex.glsl", "shaders/skybox-fragment.glsl");
+    skybox2 = new Skybox(faces2, "shaders/skybox-vertex.glsl", "shaders/skybox-fragment.glsl");
+    
     matProj = glm::perspective(glm::radians(80.0f), windowWidth/(float)windowHeight, 0.1f, 50.0f);
 }
 
@@ -379,22 +375,28 @@ void DisplayScene() {
         }
     }
 
+    ImGui::Text("Wybierz Skybox:");
+    ImGui::RadioButton("Jeden", &currentSkybox, 0);
+    ImGui::RadioButton("Dwa", &currentSkybox, 1);
+
     ImGui::End();
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    if (mySkybox) {
+    glDepthFunc(GL_LEQUAL);
+    glDepthMask(GL_FALSE);
 
-        glDepthFunc(GL_LEQUAL); 
-        glDepthMask(GL_FALSE); 
+    glm::mat4 viewStatic = glm::mat4(glm::mat3(matView));
 
-        glm::mat4 viewStatic = glm::mat4(glm::mat3(matView)); 
-
-        mySkybox->draw(matProj, viewStatic, 40.0f);
-
-        glDepthMask(GL_TRUE);
-        glDepthFunc(GL_LESS); 
+    if (currentSkybox == 0 && skybox1) {
+        skybox1->draw(matProj, viewStatic, 40.0f);
+    } 
+    else if (currentSkybox == 1 && skybox2) {
+        skybox2->draw(matProj, viewStatic, 40.0f);
     }
+
+    glDepthMask(GL_TRUE);
+    glDepthFunc(GL_LESS);
 
     glUseProgram(idProgram);
 
@@ -582,7 +584,8 @@ int main() {
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
     for(auto& m : meshes) m.Release();
-    if (mySkybox) delete mySkybox;
+    delete skybox1;
+    delete skybox2;
     glfwTerminate();
     return 0;
 }
