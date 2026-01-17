@@ -12,7 +12,6 @@ struct Material {
     float shininess;
 };
 
-// Struktura dla wielu świateł punktowych
 struct PointLight {
     vec3 position;
     vec3 color;
@@ -20,14 +19,14 @@ struct PointLight {
 };
 
 // --- UNIFORMY ---
-uniform PointLight lights[4];    // Tablica świateł punktowych (N)
-uniform int activeLightsCount;   // Liczba aktywnych świateł (1-4)
-uniform vec3 dirLightDirection;  // Kierunek słońca (H)
-uniform vec3 lightColor;         // Kolor bazowy (używany dla słońca i źródeł)
+uniform PointLight lights[4];
+uniform int activeLightsCount;
+uniform vec3 dirLightDirection;
+uniform vec3 lightColor;
 uniform vec3 viewPos;
 uniform bool useLighting;
 uniform bool useBlinnPhong;
-uniform bool isPointLight;       // true = punktowe (jedno lub wiele), false = kierunkowe
+uniform bool isPointLight;
 uniform bool bIsLightSource;
 
 uniform sampler2D uTextureSampler;
@@ -35,24 +34,22 @@ uniform bool bUseTexture;
 uniform vec3 uColor;
 uniform Material material;
 
-// FUNKCJA OBLICZAJĄCA JEDNO ŚWIATŁO PUNKTOWE
+// NOWE UNIFORMY DLA ODBIĆ
+uniform samplerCube tex_skybox;
+uniform float reflectionFactor; // 0.0 = brak odbić, 1.0 = czyste lustro
+
 vec3 CalcPointLight(PointLight light, vec3 norm, vec3 fragPos, vec3 viewDir, vec3 baseColor) {
     vec3 lightDir = normalize(light.position - fragPos);
-    
-    // Attenuation
-    // Attenuation - coraz mniej swieci z odlegloscia, w kierunkowym swieci tak samo mocno wszedzie 
     float distance = length(light.position - fragPos);
     float attenuation = 1.0 / (1.0 + 0.07 * distance + 0.017 * (distance * distance));
     
-    // Diffuse
     float diff = max(dot(norm, lightDir), 0.0);
     
-    // Specular
     float spec = 0.0;
     if(useBlinnPhong) {
         vec3 halfwayDir = normalize(lightDir + viewDir);
         spec = pow(max(dot(norm, halfwayDir), 0.0), material.shininess);
-    } else { //tutaj jest Phong
+    } else {
         vec3 reflectDir = reflect(-lightDir, norm);
         spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
     }
@@ -66,30 +63,33 @@ vec3 CalcPointLight(PointLight light, vec3 norm, vec3 fragPos, vec3 viewDir, vec
 
 void main()
 {
-    // Jeśli to wizualizacja żarówki (G)
     if(bIsLightSource) {
         FragColor = vec4(lightColor, 1.0);
         return;
     }
 
-    // Kolor bazowy
     vec4 baseColor = bUseTexture ? texture(uTextureSampler, TexCoords) : vec4(uColor, 1.0);
     if(baseColor.a < 0.1) discard;
 
-    // Rendering bez oświetlenia (F1)
+    vec3 norm = normalize(Normal);
+    vec3 viewDir = normalize(viewPos - FragPos);
+
+    // --- OBLICZANIE ODBICIA (Environment Mapping) ---
+    vec3 I = normalize(FragPos - viewPos);
+    vec3 R = reflect(I, norm);
+    vec3 envColor = texture(tex_skybox, R).rgb;
+
     if(!useLighting) {
-        FragColor = baseColor;
+        // Nawet bez świateł możemy chcieć widzieć odbicia (efekt chromu)
+        vec3 unlitResult = mix(baseColor.rgb, envColor, reflectionFactor);
+        FragColor = vec4(unlitResult, baseColor.a);
         return;
     }
 
-    vec3 norm = normalize(Normal);
-    vec3 viewDir = normalize(viewPos - FragPos);
     vec3 result = vec3(0.0);
 
-    // --- LOGIKA WYBORU TRYBU ---
-    
     if(!isPointLight) {
-        // --- TRYB KIERUNKOWY (H) ---
+        // TRYB KIERUNKOWY
         float lightIntensity = 0.8; 
         vec3 effectiveLightColor = lightColor * lightIntensity;
         vec3 lightDir = normalize(-dirLightDirection);
@@ -111,11 +111,15 @@ void main()
         result = ambient + diffuse + specular;
     } 
     else {
-        // --- TRYB WIELU ŚWIATEŁ PUNKTOWYCH (N) ---
+        // TRYB PUNKTOWY
         for(int i = 0; i < activeLightsCount; i++) {
             result += CalcPointLight(lights[i], norm, FragPos, viewDir, baseColor.rgb);
         }
     }
 
-    FragColor = vec4(result, baseColor.a);
+    // --- FINALNY MIX: Światło + Odbicie ---
+    // Mieszamy wynik oświetlenia Phonga z kolorem ze skyboxa
+    vec3 finalColor = mix(result, envColor, reflectionFactor);
+
+    FragColor = vec4(finalColor, baseColor.a);
 }

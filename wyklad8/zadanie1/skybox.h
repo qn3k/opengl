@@ -28,6 +28,8 @@ public:
 
     // Metoda renderująca
     void draw(const glm::mat4& matProj, const glm::mat4& matView, float scale = 100.0f);
+
+    GLuint getTextureID() const { return idTexture; }
 };
 
 #endif

@@ -145,7 +145,7 @@ void DisplayScene() {
         }
     }
 
-    ImGui::Text("Wybierz Skybox:");
+    ImGui::Text("\nWybierz Skybox:");
     ImGui::RadioButton("Jeden", &currentSkybox, 0);
     ImGui::RadioButton("Dwa", &currentSkybox, 1);
 
@@ -213,6 +213,11 @@ void DisplayScene() {
 
     GLint loc_bUseTexture = glGetUniformLocation(idProgram, "bUseTexture");
 
+    glActiveTexture(GL_TEXTURE1);
+    if (currentSkybox == 0) glBindTexture(GL_TEXTURE_CUBE_MAP, skybox1->getTextureID());
+    else glBindTexture(GL_TEXTURE_CUBE_MAP, skybox2->getTextureID());
+    glUniform1i(glGetUniformLocation(idProgram, "tex_skybox"), 1);
+
     for (const auto& obj : scene) {
         // Macierz modelu
         glm::mat4 matModel = glm::mat4(1.0);
@@ -238,6 +243,11 @@ void DisplayScene() {
         } else {
             glUniform1i(loc_bUseTexture, 0);
         }
+
+        // Jeśli to koliber, ustaw siłę odbicia
+        float rFact = 0.0f;
+        if (obj.mesh == &meshes[5]) rFact = 0.6f; // Koliber odbija w 60%
+        glUniform1f(glGetUniformLocation(idProgram, "reflectionFactor"), rFact);
 
         obj.mesh->Draw();
     }

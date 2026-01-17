@@ -102,11 +102,12 @@ GLuint LoadTexture(const char* path) {
 }
 
 void InitializeResources(std::vector<CMesh>& meshes, std::vector<GLuint>& textures) {
-    CMesh mGround, mCube, mSphere, mMonkey, mFlower;
+    CMesh mGround, mCube, mSphere, mMonkey,mKoliber ,mFlower;
     mGround.Load("obj/cube.obj"); 
     mCube.Load("obj/cube.obj");
     mSphere.Load("obj/sphere.obj");
     mMonkey.Load("obj/monkey.obj");
+    mKoliber.Load("obj/koliber.obj");
     mFlower = CMesh::CreateFlowerMesh();
 
     meshes.push_back(mGround); // 0
@@ -114,6 +115,7 @@ void InitializeResources(std::vector<CMesh>& meshes, std::vector<GLuint>& textur
     meshes.push_back(mSphere); // 2
     meshes.push_back(mMonkey); // 3
     meshes.push_back(mFlower); // 4
+    meshes.push_back(mKoliber); //5
 
     textures.push_back(0); // 0
     textures.push_back(LoadTexture("textures/grass.png")); 
@@ -196,4 +198,16 @@ void BuildScene(std::vector<SceneObject>& scene, std::vector<CMesh>& meshes, std
     flower2.position = glm::vec3(-3.0f, -0.5f, 3.0f);
     flower2.rotation = glm::vec3(0.0f, 1.57f, 0.0f); 
     scene.push_back(flower2);
+
+    // --- OBIEKT 6: KOLIBER ---
+    SceneObject koliber;
+    koliber.mesh = &meshes[5]; 
+    koliber.position = glm::vec3(0.0f, 5.0f, 0.0f); // Wyżej nad ziemią
+    koliber.rotation = glm::vec3(0.0f, 1.57f, 0.0f);
+    koliber.scale = glm::vec3(2.0f); 
+    koliber.color = glm::vec3(0.1f, 0.5f, 0.4f); 
+    koliber.idTexture = 0;
+    koliber.mat = {0.2f, 0.8f, 1.0f, 128.0f}; 
+    scene.push_back(koliber);
+
 }
