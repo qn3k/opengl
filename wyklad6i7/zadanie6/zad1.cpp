@@ -426,8 +426,8 @@ void DisplayScene() {
 
         // Obsługa tekstury
         if (obj.idTexture != 0) {
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, obj.idTexture);
+            glActiveTexture(GL_TEXTURE0); //aktywowanie jednostki teksturujacej
+            glBindTexture(GL_TEXTURE_2D, obj.idTexture); //jaka teksture przekazemy i jaki rodzaj tekstury to jest
             glUniform1i(glGetUniformLocation(idProgram, "uTextureSampler"), 0);
             glUniform1i(loc_bUseTexture, 1);
         } else {
