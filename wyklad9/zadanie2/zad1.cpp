@@ -19,7 +19,6 @@ const char* windowTitle = "Skybox v1";
 glm::mat4 matProj;
 glm::vec3 lightColor = glm::vec3(1.0f, 1.0f, 1.0f); // Domyślnie białe
 
-
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_glfw.h"
 #include "imgui/imgui_impl_opengl3.h"
@@ -39,7 +38,6 @@ glm::vec3 dirLightDirection = glm::vec3(-0.2f, -1.0f, -0.3f); // Światło padaj
 Skybox* skybox1 = nullptr;
 Skybox* skybox2 = nullptr;
 int currentSkybox = 0;
-const int FLOWER_COUNT = 20;
 
 // --- STRUKTURA ŚWIATŁA ---
 struct PointLight {
@@ -100,8 +98,6 @@ void SetupLights() {
 
 void DisplayScene() {
 
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
     // Wykorzystanie funkcji z utilities.hpp
     glm::mat4 matView = UpdateViewMatrix();
     //glm::vec3 lightPos = glm::vec3(2.0f, 4.0f, 2.0f);
@@ -154,6 +150,8 @@ void DisplayScene() {
     ImGui::RadioButton("Dwa", &currentSkybox, 1);
 
     ImGui::End();
+
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     GLint loc_bUseTexture = glGetUniformLocation(idProgram, "bUseTexture"); //tekstury
     GLint locTiling = glGetUniformLocation(idProgram, "uTiling"); //heightmap
@@ -219,15 +217,6 @@ void DisplayScene() {
         glUniform1f(glGetUniformLocation(idProgram, (base + ".intensity").c_str()), lights[i].intensity);
     }
 
-    glUniform1i(glGetUniformLocation(idProgram, "uUseEnvMap"), 0); 
-    glUniform1f(glGetUniformLocation(idProgram, "reflectionFactor"), 0.0f); // Dla pewności 0
-    glUniform1i(glGetUniformLocation(idProgram, "bUseTexture"), 1);
-    glUniform1i(glGetUniformLocation(idProgram, "bIsInstanced"), 1);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, textures[4]);
-    meshes[4].Draw(); // wywolanie glDrawArraysInstanced
-    glUniform1i(glGetUniformLocation(idProgram, "bIsInstanced"), 0); //czy jest instancjonowany
-
     for (const auto& obj : scene) {
         // Macierz modelu
         glm::mat4 matModel = glm::mat4(1.0);
@@ -245,7 +234,7 @@ void DisplayScene() {
         glUniform1f(glGetUniformLocation(idProgram, "material.shininess"), obj.mat.shininess);
 
         // Obsługa tekstury
-        if (obj.idTexture > 0) {
+    if (obj.idTexture > 0) {
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, obj.idTexture);
             glUniform1i(glGetUniformLocation(idProgram, "uTextureSampler"), 0);
@@ -260,17 +249,12 @@ void DisplayScene() {
             glUniform1f(locTiling, 1.0f);
         }
 
-        //jesli uzywa env mappingu
-        if (obj.mesh == &meshes[5]) { // Koliber
-            glUniform1i(glGetUniformLocation(idProgram, "uUseEnvMap"), 1);
-            glUniform1f(glGetUniformLocation(idProgram, "reflectionFactor"), 0.8f);
-        } else {
-            glUniform1i(glGetUniformLocation(idProgram, "uUseEnvMap"), 0);
-            glUniform1f(glGetUniformLocation(idProgram, "reflectionFactor"), 0.0f);
-        }
+        // Jeśli to koliber, ustaw siłę odbicia
+        float rFact = 0.0f;
+        if (obj.mesh == &meshes[5]) rFact = 0.8f; // Koliber odbija w 60%
+        glUniform1f(glGetUniformLocation(idProgram, "reflectionFactor"), rFact);
 
         obj.mesh->Draw();
-
     }
 
     //RYSOWANIE "ŻARÓWKI" (klawisz G)

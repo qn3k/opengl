@@ -2,33 +2,6 @@
 #include "objloader.hpp"
 #include "stb_image.h"
 #include <stdio.h>
-#include <glm/gtc/matrix_transform.hpp>
-
-std::vector<glm::mat4> flowerMatrices;
-const int FLOWER_COUNT = 500;
-//wysokosci do kwiatow
-std::vector<float> globalHeights;
-int hmWidth = 256;
-int hmHeight = 256;
-float hmYScale = 0.2f;
-float hmXZScale = 1.0f;
-
-//obliczanie wysokosci do kwiatow z renderingu instancyjnego
-float GetHeight(float x, float z) {
-    // 1. Odwracamy centrowanie (x - width/2.0f) * xzScale
-    float mapX = (x / hmXZScale) + (hmWidth / 2.0f);
-    float mapZ = (z / hmXZScale) + (hmHeight / 2.0f);
-
-    // 2. Zaokrąglamy do najbliższego piksela
-    int ix = (int)mapX;
-    int iz = (int)mapZ;
-
-    // 3. Sprawdzamy, czy nie wychodzimy poza mapę
-    if (ix < 0 || ix >= hmWidth - 1 || iz < 0 || iz >= hmHeight - 1) return 0.0f;
-
-    // 4. Pobieramy wysokość z naszej zapisanej tablicy
-    return globalHeights[iz * hmWidth + ix];
-}
 
 // Implementacja metod CMesh
 bool CMesh::Load(const char* path) {
@@ -70,19 +43,12 @@ void CMesh::Draw() {
 
     glBindVertexArray(idVAO); 
     
-    //rendering instancyjny
-    if (isInstanced) {
-        if (usesIndices) 
+    if (usesIndices) {
         // Używane dla Heightmapy
-            glDrawElementsInstanced(GL_TRIANGLES, vertexCount, GL_UNSIGNED_INT, 0, instanceCount);
-        else 
-        // Używane dla plików OBJ i Kwiatów
-            glDrawArraysInstanced(GL_TRIANGLES, 0, vertexCount, instanceCount);
+        glDrawElements(GL_TRIANGLES, vertexCount, GL_UNSIGNED_INT, 0);
     } else {
-        if (usesIndices) 
-            glDrawElements(GL_TRIANGLES, vertexCount, GL_UNSIGNED_INT, 0);
-        else 
-            glDrawArrays(GL_TRIANGLES, 0, vertexCount); 
+        // Używane dla plików OBJ i Kwiatów
+        glDrawArrays(GL_TRIANGLES, 0, vertexCount); 
     }
     
     glBindVertexArray(0);
@@ -180,31 +146,6 @@ void InitializeResources(std::vector<CMesh>& meshes, std::vector<GLuint>& textur
     meshes.push_back(mKoliber); //5
     meshes.push_back(mTerrain); //6 
 
-    //RENDERING INSTANYCJNY
-    flowerMatrices.clear();
-    for(int i = 0; i < FLOWER_COUNT; i++) {
-        float x = (rand() % 2000 - 1000) / 10.0f; 
-        float z = (rand() % 2000 - 1000) / 10.0f;
-        
-        // Pobieramy wysokość i uwzględniamy przesunięcie terenu (-22.0)
-        float y = GetHeight(x, z) - 22.0f; 
-
-        float a = glm::radians((float)(rand() % 360));
-        float s = 0.3f + (rand() / (float)RAND_MAX) * 0.4f;
-
-        glm::mat4 m = glm::mat4(1.0f);
-        m = glm::translate(m, glm::vec3(x, y, z));
-        m = glm::rotate(m, a, glm::vec3(0.0f, 1.0f, 0.0f));
-        m = glm::scale(m, glm::vec3(s, s, s));
-        
-        flowerMatrices.push_back(m);
-    }
-
-    // Przygotuj siatkę kwiatka (meshes[4]) do instancjonowania
-    meshes[4].PrepareInstancing(flowerMatrices);
-
-
-
     textures.push_back(0); // 0
     textures.push_back(LoadTexture("textures/grass.png")); 
     textures.push_back(LoadTexture("textures/metal.png")); 
@@ -271,7 +212,7 @@ void BuildScene(std::vector<SceneObject>& scene, std::vector<CMesh>& meshes, std
     suzanne.idTexture = 0;
     suzanne.mat = {0.2f, 0.8f, 0.5f, 32.0f}; // Złoty połysk
     scene.push_back(suzanne);
-    /*
+
     // --- OBIEKT 5: KWIATY ---
     SceneObject flower1;
     flower1.mesh = &meshes[4]; 
@@ -286,7 +227,7 @@ void BuildScene(std::vector<SceneObject>& scene, std::vector<CMesh>& meshes, std
     SceneObject flower2 = flower1;
     flower2.position = glm::vec3(-3.0f, -0.5f, 3.0f);
     flower2.rotation = glm::vec3(0.0f, 1.57f, 0.0f); 
-    scene.push_back(flower2);*/
+    scene.push_back(flower2);
 
     // --- OBIEKT 6: KOLIBER ---
     SceneObject koliber;
@@ -311,19 +252,17 @@ void LoadHeightmap(const char* filename, std::vector<TerrainVertex>& vertices, s
         return;
     }
 
-    hmWidth = width; 
-    hmHeight = height;
-    globalHeights.clear();
+    float yScale = 0.2f; // Jak wysokie mają być góry
+    float xzScale = 1.0f; // Odstęp między punktami
 
     // 1. Generowanie wierzchołków
     for (int z = 0; z < height; z++) {
         for (int x = 0; x < width; x++) {
-            float y = data[z * width + x] * hmYScale;
-            globalHeights.push_back(y);
+            float y = data[z * width + x] * yScale;
             
             TerrainVertex v;
             // Centrujemy teren, odejmując połowę szerokości
-            v.position = glm::vec3((x - width/2.0f) * hmXZScale, y, (z - height/2.0f) * hmXZScale);
+            v.position = glm::vec3((x - width/2.0f) * xzScale, y, (z - height/2.0f) * xzScale);
             v.texCoords = glm::vec2((float)x / width, (float)z / height);
             v.normal = glm::vec3(0.0f, 1.0f, 0.0f); // Uproszczony normal (do poprawy później dla światła)
             
@@ -398,24 +337,4 @@ void GenerateNormals(std::vector<TerrainVertex>& vertices, int width, int height
             vertices[z * width + x].normal = glm::normalize(normal);
         }
     }
-}
-//instancjonowanie 
-void CMesh::PrepareInstancing(const std::vector<glm::mat4>& matrices) {
-    this->instanceCount = (int)matrices.size();
-    this->isInstanced = true;
-
-    glBindVertexArray(idVAO);
-
-    glGenBuffers(1, &idVBO_instance);
-    glBindBuffer(GL_ARRAY_BUFFER, idVBO_instance);
-    glBufferData(GL_ARRAY_BUFFER, matrices.size() * sizeof(glm::mat4), &matrices[0][0][0], GL_STATIC_DRAW);
-
-    // Rejestracja macierzy w slotach 3, 4, 5, 6
-    for (int i = 0; i < 4; i++) {
-        glEnableVertexAttribArray(3 + i);
-        glVertexAttribPointer(3 + i, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(sizeof(glm::vec4) * i));
-        glVertexAttribDivisor(3 + i, 1); // To jest klucz do sukcesu
-    }
-
-    glBindVertexArray(0);
 }

@@ -29,7 +29,6 @@ uniform bool useBlinnPhong;
 uniform bool isPointLight;
 uniform bool bIsLightSource;
 uniform float uTiling = 1.0; //do heightmap
-uniform bool uUseEnvMap; //czy obj korzysta z env mapping
 
 uniform sampler2D uTextureSampler;
 uniform bool bUseTexture;
@@ -124,12 +123,8 @@ void main()
     }
 
     // --- FINALNY MIX: Światło + Odbicie ---
-    vec3 mixedColor = result;
-
-    // Tylko jeśli flaga jest włączona ORAZ mamy jakiś współczynnik odbicia
-    if(uUseEnvMap && reflectionFactor > 0.0) {
-        mixedColor = mix(result, envColor, reflectionFactor);
-    }
+    // Mieszamy wynik oświetlenia Phonga z kolorem ze skyboxa
+    vec3 finalColor = mix(result, envColor, reflectionFactor);
 
     // --- DODAWANIE MGŁY ---
     float dist = length(viewPos - FragPos); // Odległość od kamery
@@ -144,7 +139,7 @@ void main()
     // Kolor mgły 
     vec3 fogColor = vec3(0.7, 0.75, 0.8); 
     
-    vec3 colorWithFog = mix(mixedColor, fogColor, fogFactor);
+    vec3 colorWithFog = mix(finalColor, fogColor, fogFactor);
 
     FragColor = vec4(colorWithFog, baseColor.a);
 }

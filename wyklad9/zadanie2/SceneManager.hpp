@@ -26,21 +26,15 @@ class CMesh {
 public:
     GLuint idVAO = 0;
     GLuint idVBO_pos, idVBO_norm, idVBO_uv;
-    GLuint idVBO_instance = 0; // Nowy bufor na macierze instancji
-    GLuint idEBO = 0;
-
     int vertexCount = 0;
     bool usesIndices = false; //do heightmapa
-    int instanceCount = 0; //liczba obiektow 
-    bool isInstanced = false;  // Flaga czy używamy instancjonowania
- 
+    GLuint idEBO = 0;
 
     bool Load(const char* path);
     void Draw();
     void Release();
     static CMesh CreateFlowerMesh();
     void CreateFromHeightmap(const std::vector<TerrainVertex>& vertices, const std::vector<unsigned int>& indices);
-    void PrepareInstancing(const std::vector<glm::mat4>& matrices);
 };
 
 struct SceneObject {
