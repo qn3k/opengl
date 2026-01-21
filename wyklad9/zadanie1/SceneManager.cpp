@@ -34,15 +34,31 @@ bool CMesh::Load(const char* path) {
         glEnableVertexAttribArray(1);
     }
     glBindVertexArray(0);
+    this->usesIndices = false; // Pliki OBJ loadera używają DrawArrays
     return true;
 }
 
-void CMesh::Draw() { if (idVAO) { glBindVertexArray(idVAO); glDrawArrays(GL_TRIANGLES, 0, vertexCount); } }
+void CMesh::Draw() { 
+    if (!idVAO) return;
+
+    glBindVertexArray(idVAO); 
+    
+    if (usesIndices) {
+        // Używane dla Heightmapy
+        glDrawElements(GL_TRIANGLES, vertexCount, GL_UNSIGNED_INT, 0);
+    } else {
+        // Używane dla plików OBJ i Kwiatów
+        glDrawArrays(GL_TRIANGLES, 0, vertexCount); 
+    }
+    
+    glBindVertexArray(0);
+}
 
 void CMesh::Release() { 
     glDeleteBuffers(1, &idVBO_pos); 
     glDeleteBuffers(1, &idVBO_norm); 
     glDeleteBuffers(1, &idVBO_uv); 
+    if (usesIndices) glDeleteBuffers(1, &idEBO); // dodano do obslugi heightmap
     glDeleteVertexArrays(1, &idVAO); 
 }
 
@@ -95,6 +111,8 @@ GLuint LoadTexture(const char* path) {
     GLenum format = (tex_n == 4) ? GL_RGBA : GL_RGB;
     glGenTextures(1, &textureID);
     glBindTexture(GL_TEXTURE_2D, textureID);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); //dodano do podlogi
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT); //to tez do podlogi
     glTexImage2D(GL_TEXTURE_2D, 0, format, tex_width, tex_height, 0, format, GL_UNSIGNED_BYTE, tex_data);
     glGenerateMipmap(GL_TEXTURE_2D);
     stbi_image_free(tex_data);
@@ -102,7 +120,7 @@ GLuint LoadTexture(const char* path) {
 }
 
 void InitializeResources(std::vector<CMesh>& meshes, std::vector<GLuint>& textures) {
-    CMesh mGround, mCube, mSphere, mMonkey,mKoliber ,mFlower;
+    CMesh mGround, mCube, mSphere, mMonkey,mKoliber ,mFlower, mTerrain;
     mGround.Load("obj/cube.obj"); 
     mCube.Load("obj/cube.obj");
     mSphere.Load("obj/sphere.obj");
@@ -110,32 +128,44 @@ void InitializeResources(std::vector<CMesh>& meshes, std::vector<GLuint>& textur
     mKoliber.Load("obj/koliber.obj");
     mFlower = CMesh::CreateFlowerMesh();
 
+    //do heightmapa
+    std::vector<TerrainVertex> terrainVerts;
+    std::vector<unsigned int> terrainIndices;
+    // 1. Wczytujemy dane z obrazka 
+    LoadHeightmap("textures/heightmap.png", terrainVerts, terrainIndices);
+    // 2. Obliczamy wektory normalne, aby pagórki reagowały na światło
+    GenerateNormals(terrainVerts, 256, 256);
+    // 3. Tworzymy VAO/VBO dla terenu
+    mTerrain.CreateFromHeightmap(terrainVerts, terrainIndices);
+
     meshes.push_back(mGround); // 0
     meshes.push_back(mCube);   // 1
     meshes.push_back(mSphere); // 2
     meshes.push_back(mMonkey); // 3
     meshes.push_back(mFlower); // 4
     meshes.push_back(mKoliber); //5
+    meshes.push_back(mTerrain); //6 
 
     textures.push_back(0); // 0
     textures.push_back(LoadTexture("textures/grass.png")); 
     textures.push_back(LoadTexture("textures/metal.png")); 
     textures.push_back(LoadTexture("textures/brick.png")); 
     textures.push_back(LoadTexture("textures/flower32bit.png"));
+    textures.push_back(LoadTexture("textures/sand.png"));
 }
 
 void BuildScene(std::vector<SceneObject>& scene, std::vector<CMesh>& meshes, std::vector<GLuint>& textures) {
 
-    // --- OBIEKT 1: Podłoże ---
-    SceneObject ground;
-    ground.mesh = &meshes[0]; 
-    ground.position = glm::vec3(0.0f, -1.0f, 0.0f);
-    ground.rotation = glm::vec3(0.0f);
-    ground.scale = glm::vec3(8.0f, 0.1f, 8.0f); 
-    ground.color = glm::vec3(1.0f); 
-    ground.idTexture = textures[1]; // Trawa
-    ground.mat = {0.2f, 0.8f, 0.0f, 1.0f}; // Matowa trawa (brak specular)
-    scene.push_back(ground);
+    // --- OBIEKT 1: PODŁOGA Z HEIGHTMAPY ---
+    SceneObject terrain;
+    terrain.mesh = &meshes[6]; // Używamy mTerrain
+    terrain.position = glm::vec3(0.0f, -22.0f, 0.0f); // Obniżamy nieco, by obiekty nie były pod ziemią
+    terrain.rotation = glm::vec3(0.0f);
+    terrain.scale = glm::vec3(1.0f); // Skala 1.0, bo LoadHeightmap już używa xzScale
+    terrain.color = glm::vec3(1.0f, 0.0f, 1.0f); 
+    terrain.idTexture = textures[5]; // Używamy piasku
+    terrain.mat = {0.2f, 0.8f, 0.1f, 2.0f}; // Materiał matowy
+    scene.push_back(terrain);
 
     // --- OBIEKT 2: Sześcian ---
     SceneObject box;
@@ -210,4 +240,101 @@ void BuildScene(std::vector<SceneObject>& scene, std::vector<CMesh>& meshes, std
     koliber.mat = {0.2f, 0.8f, 1.0f, 128.0f}; 
     scene.push_back(koliber);
 
+}
+
+void LoadHeightmap(const char* filename, std::vector<TerrainVertex>& vertices, std::vector<unsigned int>& indices) {
+    int width, height, channels;
+    // Wczytujemy obrazek jako czarno-biały (1 kanał - STBI_grey)
+    unsigned char* data = stbi_load(filename, &width, &height, &channels, 1);
+    
+    if (!data) {
+        printf("Błąd wczytywania heightmapy: %s\n", filename);
+        return;
+    }
+
+    float yScale = 0.2f; // Jak wysokie mają być góry
+    float xzScale = 1.0f; // Odstęp między punktami
+
+    // 1. Generowanie wierzchołków
+    for (int z = 0; z < height; z++) {
+        for (int x = 0; x < width; x++) {
+            float y = data[z * width + x] * yScale;
+            
+            TerrainVertex v;
+            // Centrujemy teren, odejmując połowę szerokości
+            v.position = glm::vec3((x - width/2.0f) * xzScale, y, (z - height/2.0f) * xzScale);
+            v.texCoords = glm::vec2((float)x / width, (float)z / height);
+            v.normal = glm::vec3(0.0f, 1.0f, 0.0f); // Uproszczony normal (do poprawy później dla światła)
+            
+            vertices.push_back(v);
+        }
+    }
+
+    // 2. Generowanie indeksów (budowanie dwóch trójkątów dla każdego kwadratu siatki)
+    for (int z = 0; z < height - 1; z++) {
+        for (int x = 0; x < width - 1; x++) {
+            unsigned int topLeft = z * width + x;
+            unsigned int topRight = topLeft + 1;
+            unsigned int bottomLeft = (z + 1) * width + x;
+            unsigned int bottomRight = bottomLeft + 1;
+
+            // Pierwszy trójkąt
+            indices.push_back(topLeft);
+            indices.push_back(bottomLeft);
+            indices.push_back(topRight);
+            // Drugi trójkąt
+            indices.push_back(topRight);
+            indices.push_back(bottomLeft);
+            indices.push_back(bottomRight);
+        }
+    }
+
+    stbi_image_free(data);
+}
+
+void CMesh::CreateFromHeightmap(const std::vector<TerrainVertex>& vertices, const std::vector<unsigned int>& indices) {
+    this->usesIndices = true; // Teren używa indeksów (EBO)
+    
+    glGenVertexArrays(1, &idVAO);
+    glBindVertexArray(idVAO);
+
+    GLuint vbo, ebo;
+    glGenBuffers(1, &vbo);
+    glGenBuffers(1, &idEBO); // Zapisujemy do składowej klasy
+
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(TerrainVertex), &vertices[0], GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, idEBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), &indices[0], GL_STATIC_DRAW);
+
+    // Atrybuty (pozycja, uv, normalne) - tak jak pisałeś wcześniej
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(TerrainVertex), (void*)0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(TerrainVertex), (void*)offsetof(TerrainVertex, texCoords));
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(TerrainVertex), (void*)offsetof(TerrainVertex, normal));
+    glEnableVertexAttribArray(2);
+
+    this->vertexCount = indices.size(); 
+    glBindVertexArray(0);
+}
+
+void GenerateNormals(std::vector<TerrainVertex>& vertices, int width, int height) {
+    for (int z = 0; z < height; z++) {
+        for (int x = 0; x < width; x++) {
+            // Pobieramy wysokości sąsiadów (z obsługą krawędzi)
+            float hL = vertices[z * width + std::max(0, x - 1)].position.y; 
+            float hR = vertices[z * width + std::min(width - 1, x + 1)].position.y;
+            float hD = vertices[std::max(0, z - 1) * width + x].position.y;
+            float hU = vertices[std::min(height - 1, z + 1) * width + x].position.y;
+
+            // Formuła na wektor normalny na podstawie różnicy wysokości
+            glm::vec3 normal;
+            normal.x = hL - hR;
+            normal.y = 2.0f; // Im większa wartość, tym teren wydaje się "płaski"
+            normal.z = hD - hU;
+            vertices[z * width + x].normal = glm::normalize(normal);
+        }
+    }
 }

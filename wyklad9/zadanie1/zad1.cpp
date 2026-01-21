@@ -82,7 +82,7 @@ void Initialize() {
     skybox1 = new Skybox(faces1, "shaders/skybox-vertex.glsl", "shaders/skybox-fragment.glsl");
     skybox2 = new Skybox(faces2, "shaders/skybox-vertex.glsl", "shaders/skybox-fragment.glsl");
     
-    matProj = glm::perspective(glm::radians(80.0f), windowWidth/(float)windowHeight, 0.1f, 50.0f);
+    matProj = glm::perspective(glm::radians(80.0f), windowWidth/(float)windowHeight, 0.1f, 250.0f);
 }
 
 void SetupLights() {
@@ -153,6 +153,14 @@ void DisplayScene() {
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+    GLint loc_bUseTexture = glGetUniformLocation(idProgram, "bUseTexture"); //tekstury
+    GLint locTiling = glGetUniformLocation(idProgram, "uTiling"); //heightmap
+
+    glActiveTexture(GL_TEXTURE1);
+    if (currentSkybox == 0) glBindTexture(GL_TEXTURE_CUBE_MAP, skybox1->getTextureID());
+    else glBindTexture(GL_TEXTURE_CUBE_MAP, skybox2->getTextureID());
+    glUniform1i(glGetUniformLocation(idProgram, "tex_skybox"), 1);
+
     glDepthFunc(GL_LEQUAL);
     glDepthMask(GL_FALSE);
 
@@ -209,15 +217,6 @@ void DisplayScene() {
         glUniform1f(glGetUniformLocation(idProgram, (base + ".intensity").c_str()), lights[i].intensity);
     }
 
-
-
-    GLint loc_bUseTexture = glGetUniformLocation(idProgram, "bUseTexture");
-
-    glActiveTexture(GL_TEXTURE1);
-    if (currentSkybox == 0) glBindTexture(GL_TEXTURE_CUBE_MAP, skybox1->getTextureID());
-    else glBindTexture(GL_TEXTURE_CUBE_MAP, skybox2->getTextureID());
-    glUniform1i(glGetUniformLocation(idProgram, "tex_skybox"), 1);
-
     for (const auto& obj : scene) {
         // Macierz modelu
         glm::mat4 matModel = glm::mat4(1.0);
@@ -235,13 +234,19 @@ void DisplayScene() {
         glUniform1f(glGetUniformLocation(idProgram, "material.shininess"), obj.mat.shininess);
 
         // Obsługa tekstury
-        if (obj.idTexture != 0) {
+    if (obj.idTexture > 0) {
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, obj.idTexture);
             glUniform1i(glGetUniformLocation(idProgram, "uTextureSampler"), 0);
-            glUniform1i(loc_bUseTexture, 1);
+            glUniform1i(loc_bUseTexture, 1); // Włączamy teksturę
         } else {
-            glUniform1i(loc_bUseTexture, 0);
+            glUniform1i(loc_bUseTexture, 0); // Wyłączamy teksturę, używamy uColor
+        }
+        //Jeśli podłoga to locTiling na 32.0
+        if (obj.mesh == &meshes[6]) {
+            glUniform1f(locTiling, 32.0f); 
+        } else {
+            glUniform1f(locTiling, 1.0f);
         }
 
         // Jeśli to koliber, ustaw siłę odbicia

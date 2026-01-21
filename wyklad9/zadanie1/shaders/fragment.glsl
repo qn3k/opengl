@@ -28,6 +28,7 @@ uniform bool useLighting;
 uniform bool useBlinnPhong;
 uniform bool isPointLight;
 uniform bool bIsLightSource;
+uniform float uTiling = 1.0; //do heightmap
 
 uniform sampler2D uTextureSampler;
 uniform bool bUseTexture;
@@ -68,7 +69,11 @@ void main()
         return;
     }
 
-    vec4 baseColor = bUseTexture ? texture(uTextureSampler, TexCoords) : vec4(uColor, 1.0);
+    //heightmap
+    vec2 finalUV = TexCoords * uTiling; 
+    
+    vec4 baseColor = bUseTexture ? texture(uTextureSampler, finalUV) : vec4(uColor, 1.0);
+    
     if(baseColor.a < 0.1) discard;
 
     vec3 norm = normalize(Normal);
@@ -121,5 +126,20 @@ void main()
     // Mieszamy wynik oświetlenia Phonga z kolorem ze skyboxa
     vec3 finalColor = mix(result, envColor, reflectionFactor);
 
-    FragColor = vec4(finalColor, baseColor.a);
+    // --- DODAWANIE MGŁY ---
+    float dist = length(viewPos - FragPos); // Odległość od kamery
+    
+    // Parametry mgły: 
+    float fogStart = 60.0;
+    float fogEnd = 120.0;
+    
+    // Obliczamy współczynnik mgły 
+    float fogFactor = clamp((dist - fogStart) / (fogEnd - fogStart), 0.0, 1.0);
+    
+    // Kolor mgły 
+    vec3 fogColor = vec3(0.7, 0.75, 0.8); 
+    
+    vec3 colorWithFog = mix(finalColor, fogColor, fogFactor);
+
+    FragColor = vec4(colorWithFog, baseColor.a);
 }

@@ -15,16 +15,26 @@ struct Material {
     float shininess;
 };
 
+//podloga z heightmap
+struct TerrainVertex {
+    glm::vec3 position;
+    glm::vec2 texCoords;
+    glm::vec3 normal;
+};
+
 class CMesh {
 public:
     GLuint idVAO = 0;
     GLuint idVBO_pos, idVBO_norm, idVBO_uv;
     int vertexCount = 0;
+    bool usesIndices = false; //do heightmapa
+    GLuint idEBO = 0;
 
     bool Load(const char* path);
     void Draw();
     void Release();
     static CMesh CreateFlowerMesh();
+    void CreateFromHeightmap(const std::vector<TerrainVertex>& vertices, const std::vector<unsigned int>& indices);
 };
 
 struct SceneObject {
@@ -41,5 +51,7 @@ struct SceneObject {
 GLuint LoadTexture(const char* path);
 void InitializeResources(std::vector<CMesh>& meshes, std::vector<GLuint>& textures);
 void BuildScene(std::vector<SceneObject>& scene, std::vector<CMesh>& meshes, std::vector<GLuint>& textures);
+void LoadHeightmap(const char* filename, std::vector<TerrainVertex>& vertices, std::vector<unsigned int>& indices);
+void GenerateNormals(std::vector<TerrainVertex>& vertices, int width, int height);
 
 #endif
