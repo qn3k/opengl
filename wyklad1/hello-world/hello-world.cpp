@@ -4,10 +4,12 @@
 // Hello World w OpenGL
 // -------------------------------------------------
 #include <stdio.h>
+#include <stdlib.h>
 
 // Pliki naglowkoweg OpenGLa
 #include <GL/glew.h>
-#include <GL/freeglut.h>
+#define GL_SILENCE_DEPRECATION
+#include <GLUT/glut.h>
 
 
 // Identyfikatory obiektow
@@ -37,15 +39,13 @@ int main( int argc, char *argv[] )
 
 	// freeGLUT
 	glutInit( &argc, argv );
-	glutInitDisplayMode( GLUT_DOUBLE | GLUT_RGB );
-	glutInitContextVersion( 3, 3 );
-	glutInitContextProfile( GLUT_CORE_PROFILE );
+	glutInitDisplayMode( GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH | GLUT_3_2_CORE_PROFILE );
 	glutInitWindowSize( 500, 500 );
 	glutCreateWindow( "Hello World w OpenGL!" );
 
 	glutDisplayFunc( DisplayScene );
 	glutReshapeFunc( Reshape );
-
+	glutIdleFunc( DisplayScene ); 
 
 	// GLEW
 	glewExperimental = GL_TRUE;
@@ -62,6 +62,8 @@ int main( int argc, char *argv[] )
 		printf("Brak OpenGL 3.3!\n");
 		exit(1);
 	}
+
+	glGetError();
 
 	// Stworzenie obiektow OpenGLa
 	// buforow, potoku, przekazanie danych
@@ -120,6 +122,7 @@ void DisplayScene()
 // ---------------------------------------
 void Initialize()
 {
+	printf("Program startuje...\n");
 	// ---------------------------------------
 	// Etap (2) przeslanie danych geometrii do OpenGL
 	// ---------------------------------------
@@ -161,6 +164,14 @@ void Initialize()
 
 	// Walidacja programu
 	glLinkProgram( idProgram );
+
+	GLint linkStatus;
+	glGetProgramiv(idProgram, GL_LINK_STATUS, &linkStatus);
+	if (linkStatus != GL_TRUE) {
+		char log[512];
+		glGetProgramInfoLog(idProgram, 512, NULL, log);
+		printf("Blad linkowania programu: %s\n", log);
+	}
 	glValidateProgram( idProgram );
 
 
