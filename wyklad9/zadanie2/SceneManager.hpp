@@ -21,20 +21,28 @@ struct TerrainVertex {
     glm::vec2 texCoords;
     glm::vec3 normal;
 };
+//pobieranie wysokosci z ground jako obj
+float GetHeight(float x, float z);
 
 class CMesh {
 public:
     GLuint idVAO = 0;
     GLuint idVBO_pos, idVBO_norm, idVBO_uv;
+    GLuint idVBO_instance = 0; // Nowy bufor na macierze instancji
+    GLuint idEBO = 0;
+    std::vector<glm::vec3> vertices;
+
     int vertexCount = 0;
     bool usesIndices = false; //do heightmapa
-    GLuint idEBO = 0;
+    int instanceCount = 0; //liczba obiektow 
+    bool isInstanced = false;  // Flaga czy używamy instancjonowania
 
     bool Load(const char* path);
     void Draw();
     void Release();
     static CMesh CreateFlowerMesh();
     void CreateFromHeightmap(const std::vector<TerrainVertex>& vertices, const std::vector<unsigned int>& indices);
+    void PrepareInstancing(const std::vector<glm::mat4>& matrices);
 };
 
 struct SceneObject {

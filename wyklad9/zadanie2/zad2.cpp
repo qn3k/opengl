@@ -19,6 +19,7 @@ const char* windowTitle = "Skybox v1";
 glm::mat4 matProj;
 glm::vec3 lightColor = glm::vec3(1.0f, 1.0f, 1.0f); // Domyślnie białe
 
+
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_glfw.h"
 #include "imgui/imgui_impl_opengl3.h"
@@ -26,6 +27,11 @@ glm::vec3 lightColor = glm::vec3(1.0f, 1.0f, 1.0f); // Domyślnie białe
 #include "objloader.hpp" 
 #include "SceneManager.hpp"
 #include "skybox.h"
+#include "ground.hpp"
+#include "player.hpp"
+
+CGround myGround;
+CPlayer myPlayer;
 
 // --- USTAWIENIA GLOBALNE ---
 bool useLighting = true;
@@ -38,6 +44,7 @@ glm::vec3 dirLightDirection = glm::vec3(-0.2f, -1.0f, -0.3f); // Światło padaj
 Skybox* skybox1 = nullptr;
 Skybox* skybox2 = nullptr;
 int currentSkybox = 0;
+const int FLOWER_COUNT = 20;
 
 // --- STRUKTURA ŚWIATŁA ---
 struct PointLight {
@@ -55,6 +62,8 @@ GLuint idProgram;
 std::vector<CMesh> meshes;
 std::vector<SceneObject> scene;
 std::vector<GLuint> textures;
+bool keys[1024];
+int playerIdx = -1;
 
 void Initialize() {
 
@@ -74,6 +83,15 @@ void Initialize() {
     //Przeniesienie ladowania obiektow do zewnetrznych funkcji
     InitializeResources(meshes, textures);
     BuildScene(scene, meshes, textures);
+    for(int i=0; i<scene.size(); i++) {
+        if(scene[i].mesh == &meshes[7]) { 
+            playerIdx = i;
+            break;
+        }
+    }
+    myGround.Init(); 
+    myPlayer.Init(&myGround);
+    myPlayer.position.y = myGround.getY(glm::vec2(myPlayer.position.x, myPlayer.position.z));
 
     // Konfiguracja Skyboxa
     std::vector<std::string> faces1 = {"skybox1/posx.jpg","skybox1/negx.jpg","skybox1/posy.jpg","skybox1/negy.jpg","skybox1/posz.jpg","skybox1/negz.jpg"};
@@ -85,6 +103,17 @@ void Initialize() {
     matProj = glm::perspective(glm::radians(80.0f), windowWidth/(float)windowHeight, 0.1f, 250.0f);
 }
 
+//sterowanie postacia
+void handleInput() {
+    float speed = 0.05f;
+    float rotSpeed = 0.03f;
+    if (keys[GLFW_KEY_W]) myPlayer.Move(speed);
+    if (keys[GLFW_KEY_S]) myPlayer.Move(-speed);
+    if (keys[GLFW_KEY_A]) myPlayer.Rotate(rotSpeed);
+    if (keys[GLFW_KEY_D]) myPlayer.Rotate(-rotSpeed);
+}
+
+//swiatla kolorowe
 void SetupLights() {
     // Światło 1: Białe (krążące - to co już masz)
     lights[0] = { glm::vec3(0, 3, 0), glm::vec3(1.0, 1.0, 1.0), 1.5f };
@@ -98,10 +127,46 @@ void SetupLights() {
 
 void DisplayScene() {
 
-    // Wykorzystanie funkcji z utilities.hpp
-    glm::mat4 matView = UpdateViewMatrix();
-    //glm::vec3 lightPos = glm::vec3(2.0f, 4.0f, 2.0f);
-    glm::vec3 camPos = ExtractCameraPos(matView);  
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    //chodzenie ludzika
+    if(playerIdx != -1) {
+    scene[playerIdx].position = myPlayer.position;
+    scene[playerIdx].rotation.y = myPlayer.rotationY;
+    }
+
+    handleInput();
+    scene.back().position = myPlayer.position;
+    scene.back().rotation = glm::vec3(0.0f, myPlayer.rotationY , 0.0f);
+
+    //obsluga kamery wokol srodka
+    //glm::mat4 matView = UpdateViewMatrix(); 
+    //glm::vec3 cameraPos = ExtractCameraPos(matView);  
+
+    // obsluga kamery tpp
+    
+    float camDist = 5.0f;  // Odległość kamery od gracza
+    float camHeight = 2.0f; // Wysokość kamery nad ziemią
+
+    // Obliczamy pozycję kamery (za plecami gracza)
+    glm::vec3 cameraPos;
+
+    float angleOffset = 1.57f; // 90 stopni
+    cameraPos.x = myPlayer.position.x - camDist * sin(myPlayer.rotationY + angleOffset);
+    cameraPos.z = myPlayer.position.z - camDist * cos(myPlayer.rotationY + angleOffset);
+    cameraPos.y = myPlayer.position.y + camHeight;
+
+    // Patrzymy na punkt nieco nad stopami gracza (np. na klatkę piersiową)
+    glm::vec3 lookAtPoint = myPlayer.position + glm::vec3(0.0f, 1.0f, 0.0f);
+
+    glm::mat4 matView = glm::lookAt(cameraPos, lookAtPoint, glm::vec3(0.0f, 1.0f, 0.0f));
+    glUniformMatrix4fv(glGetUniformLocation(idProgram, "matView"), 1, GL_FALSE, glm::value_ptr(matView));
+
+    //glm::vec3 cameraOffset = glm::vec3(-5.0f * sin(myPlayer.rotationY), 3.0f, -5.0f * cos(myPlayer.rotationY));
+    //glm::vec3 cameraPos = myPlayer.position + cameraOffset;
+    //glm::mat4 matView = glm::lookAt(cameraPos, myPlayer.position + glm::vec3(0, 1.5f, 0), glm::vec3(0, 1, 0));
+    
+    glm::mat4 viewStatic = glm::mat4(glm::mat3(matView));
 
     // --- START IMGUI FRAME ---
     ImGui_ImplOpenGL3_NewFrame();
@@ -151,8 +216,6 @@ void DisplayScene() {
 
     ImGui::End();
 
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
     GLint loc_bUseTexture = glGetUniformLocation(idProgram, "bUseTexture"); //tekstury
     GLint locTiling = glGetUniformLocation(idProgram, "uTiling"); //heightmap
 
@@ -163,8 +226,6 @@ void DisplayScene() {
 
     glDepthFunc(GL_LEQUAL);
     glDepthMask(GL_FALSE);
-
-    glm::mat4 viewStatic = glm::mat4(glm::mat3(matView));
 
     if (currentSkybox == 0 && skybox1) {
         skybox1->draw(matProj, viewStatic, 40.0f);
@@ -196,7 +257,7 @@ void DisplayScene() {
     glUniformMatrix4fv(glGetUniformLocation(idProgram, "matView"), 1, GL_FALSE, glm::value_ptr(matView));
     glUniform3fv(glGetUniformLocation(idProgram, "lightPos"), 1, glm::value_ptr(currentLightPos));
     glUniform3fv(glGetUniformLocation(idProgram, "lightColor"), 1, glm::value_ptr(lightColor)); 
-    glUniform3fv(glGetUniformLocation(idProgram, "viewPos"), 1, glm::value_ptr(camPos));
+    glUniform3fv(glGetUniformLocation(idProgram, "viewPos"), 1, glm::value_ptr(cameraPos));
     glUniform1i(glGetUniformLocation(idProgram, "useLighting"), useLighting);
     glUniform1i(glGetUniformLocation(idProgram, "useBlinnPhong"), useBlinnPhong);
     glUniform1i(glGetUniformLocation(idProgram, "bIsLightSource"), false);
@@ -217,6 +278,20 @@ void DisplayScene() {
         glUniform1f(glGetUniformLocation(idProgram, (base + ".intensity").c_str()), lights[i].intensity);
     }
 
+    glUniform1i(glGetUniformLocation(idProgram, "uUseEnvMap"), 0); 
+    glUniform1f(glGetUniformLocation(idProgram, "reflectionFactor"), 0.0f); // Dla pewności 0
+    glUniform1i(glGetUniformLocation(idProgram, "bUseTexture"), 1);
+
+    //instancjonowane
+    glUniform1i(glGetUniformLocation(idProgram, "bIsInstanced"), 1);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, textures[4]);
+    glUniform1i(glGetUniformLocation(idProgram, "uTextureSampler"), 0);
+    meshes[4].Draw(); // wywolanie glDrawArraysInstanced
+
+    //powrot do zwyklych obiektow
+    glUniform1i(glGetUniformLocation(idProgram, "bIsInstanced"), 0); //czy jest instancjonowany
+
     for (const auto& obj : scene) {
         // Macierz modelu
         glm::mat4 matModel = glm::mat4(1.0);
@@ -234,7 +309,7 @@ void DisplayScene() {
         glUniform1f(glGetUniformLocation(idProgram, "material.shininess"), obj.mat.shininess);
 
         // Obsługa tekstury
-    if (obj.idTexture > 0) {
+        if (obj.idTexture > 0) {
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, obj.idTexture);
             glUniform1i(glGetUniformLocation(idProgram, "uTextureSampler"), 0);
@@ -242,19 +317,25 @@ void DisplayScene() {
         } else {
             glUniform1i(loc_bUseTexture, 0); // Wyłączamy teksturę, używamy uColor
         }
-        //Jeśli podłoga to locTiling na 32.0
-        if (obj.mesh == &meshes[6]) {
-            glUniform1f(locTiling, 32.0f); 
+
+        //Jeśli nowa podłoga to locTiling na 32.0
+        if (obj.mesh == &meshes[0]) {
+            glUniform1f(locTiling, 8.0f); 
         } else {
             glUniform1f(locTiling, 1.0f);
         }
 
-        // Jeśli to koliber, ustaw siłę odbicia
-        float rFact = 0.0f;
-        if (obj.mesh == &meshes[5]) rFact = 0.8f; // Koliber odbija w 60%
-        glUniform1f(glGetUniformLocation(idProgram, "reflectionFactor"), rFact);
+        //jesli uzywa env mappingu
+        if (obj.mesh == &meshes[5]) { // Koliber
+            glUniform1i(glGetUniformLocation(idProgram, "uUseEnvMap"), 1);
+            glUniform1f(glGetUniformLocation(idProgram, "reflectionFactor"), 0.8f);
+        } else {
+            glUniform1i(glGetUniformLocation(idProgram, "uUseEnvMap"), 0);
+            glUniform1f(glGetUniformLocation(idProgram, "reflectionFactor"), 0.0f);
+        }
 
         obj.mesh->Draw();
+
     }
 
     //RYSOWANIE "ŻARÓWKI" (klawisz G)
@@ -280,6 +361,13 @@ void DisplayScene() {
 
 // Nadpisujemy key_callback
 void my_key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+    if (key >= 0 && key < 1024) {
+        if (action == GLFW_PRESS)
+            keys[key] = true;
+        else if (action == GLFW_RELEASE)
+            keys[key] = false;
+    }
+
     key_callback(window, key, scancode, action, mods);
 
     if (action == GLFW_PRESS) {

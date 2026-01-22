@@ -2,21 +2,85 @@
 #include "objloader.hpp"
 #include "stb_image.h"
 #include <stdio.h>
+#include <glm/gtc/matrix_transform.hpp>
+
+std::vector<glm::mat4> flowerMatrices;
+const int FLOWER_COUNT = 2500;
+//wysokosci do kwiatow
+std::vector<float> globalHeights;
+int hmWidth = 256;
+int hmHeight = 256;
+float hmYScale = 0.2f;
+float hmXZScale = 1.0f;
+
+//obliczanie wysokosci do kwiatow z renderingu instancyjnego
+
+// Funkcja pomocnicza do sprawdzania czy punkt jest wewnątrz trójkąta (rzut na XZ)
+bool isPointInTriangle(glm::vec2 p, glm::vec2 a, glm::vec2 b, glm::vec2 c) {
+    float det = (b.y - c.y) * (a.x - c.x) + (c.x - b.x) * (a.y - c.y);
+    float l1 = ((b.y - c.y) * (p.x - c.x) + (c.x - b.x) * (p.y - c.y)) / det;
+    float l2 = ((c.y - a.y) * (p.x - c.x) + (a.x - c.x) * (p.y - c.y)) / det;
+    float l3 = 1.0f - l1 - l2;
+    return l1 >= 0 && l2 >= 0 && l3 >= 0;
+}
+
+// Globalny wskaźnik na mesha podłogi (ustawimy go w InitializeResources)
+CMesh* groundMeshPtr = nullptr;
+
+float GetHeight(float x, float z) {
+    if (!groundMeshPtr || groundMeshPtr->vertices.empty()) return 0.0f;
+
+    // Definiujemy skale 
+    float scaleX = 4.0f;
+    float scaleY = 1.0f;
+    float scaleZ = 4.0f;
+    
+    glm::vec2 p(x, z);
+
+    for (size_t i = 0; i < groundMeshPtr->vertices.size(); i += 3) {
+        glm::vec3 v1 = groundMeshPtr->vertices[i];
+        v1.x *= scaleX; v1.y *= scaleY; v1.z *= scaleZ;
+
+        glm::vec3 v2 = groundMeshPtr->vertices[i+1];
+        v2.x *= scaleX; v2.y *= scaleY; v2.z *= scaleZ;
+
+        glm::vec3 v3 = groundMeshPtr->vertices[i+2];
+        v3.x *= scaleX; v3.y *= scaleY; v3.z *= scaleZ;
+
+        // Sprawdzamy, czy gracz jest nad tym trójkątem (rzut na płaszczyznę XZ)
+        if (isPointInTriangle(p, glm::vec2(v1.x, v1.z), glm::vec2(v2.x, v2.z), glm::vec2(v3.x, v3.z))) {
+            
+            // Obliczamy wyznacznik (determinant) dla współrzędnych barycentrycznych
+            float det = (v2.z - v3.z) * (v1.x - v3.x) + (v3.x - v2.x) * (v1.z - v3.z);
+            
+            // Zabezpieczenie przed dzieleniem przez zero (trójkąt pionowy lub zdegenerowany)
+            if (std::abs(det) < 0.00001f) continue;
+
+            float l1 = ((v2.z - v3.z) * (x - v3.x) + (v3.x - v2.x) * (z - v3.z)) / det;
+            float l2 = ((v3.z - v1.z) * (x - v3.x) + (v1.x - v3.x) * (z - v3.z)) / det;
+            float l3 = 1.0f - l1 - l2;
+
+            // Zwracamy wypadkową wysokość Y
+            return l1 * v1.y + l2 * v2.y + l3 * v3.y;
+        }
+    }
+    return 0.0f; 
+}
 
 // Implementacja metod CMesh
 bool CMesh::Load(const char* path) {
-    std::vector<glm::vec3> vertices;
     std::vector<glm::vec2> uvs;
     std::vector<glm::vec3> normals;
-    if (!loadOBJ(path, vertices, uvs, normals)) return false;
+    
+    if (!loadOBJ(path, this->vertices, uvs, normals)) return false;
 
-    vertexCount = vertices.size();
+    vertexCount = this->vertices.size();
     glGenVertexArrays(1, &idVAO);
     glBindVertexArray(idVAO);
 
     glGenBuffers(1, &idVBO_pos);
     glBindBuffer(GL_ARRAY_BUFFER, idVBO_pos);
-    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(glm::vec3), &vertices[0], GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, this->vertices.size() * sizeof(glm::vec3), &this->vertices[0], GL_STATIC_DRAW);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, NULL);
     glEnableVertexAttribArray(0);
 
@@ -43,12 +107,19 @@ void CMesh::Draw() {
 
     glBindVertexArray(idVAO); 
     
-    if (usesIndices) {
+    //rendering instancyjny
+    if (isInstanced) {
+        if (usesIndices) 
         // Używane dla Heightmapy
-        glDrawElements(GL_TRIANGLES, vertexCount, GL_UNSIGNED_INT, 0);
-    } else {
+            glDrawElementsInstanced(GL_TRIANGLES, vertexCount, GL_UNSIGNED_INT, 0, instanceCount);
+        else 
         // Używane dla plików OBJ i Kwiatów
-        glDrawArrays(GL_TRIANGLES, 0, vertexCount); 
+            glDrawArraysInstanced(GL_TRIANGLES, 0, vertexCount, instanceCount);
+    } else {
+        if (usesIndices) 
+            glDrawElements(GL_TRIANGLES, vertexCount, GL_UNSIGNED_INT, 0);
+        else 
+            glDrawArrays(GL_TRIANGLES, 0, vertexCount); 
     }
     
     glBindVertexArray(0);
@@ -120,12 +191,13 @@ GLuint LoadTexture(const char* path) {
 }
 
 void InitializeResources(std::vector<CMesh>& meshes, std::vector<GLuint>& textures) {
-    CMesh mGround, mCube, mSphere, mMonkey,mKoliber ,mFlower, mTerrain;
-    mGround.Load("obj/cube.obj"); 
+    CMesh mGround, mCube, mSphere, mMonkey,mKoliber ,mFlower, mTerrain, playerObj;
+    mGround.Load("obj/scene-plane.obj"); 
     mCube.Load("obj/cube.obj");
     mSphere.Load("obj/sphere.obj");
     mMonkey.Load("obj/monkey.obj");
     mKoliber.Load("obj/koliber.obj");
+    playerObj.Load("obj/lego.obj"); 
     mFlower = CMesh::CreateFlowerMesh();
 
     //do heightmapa
@@ -145,6 +217,35 @@ void InitializeResources(std::vector<CMesh>& meshes, std::vector<GLuint>& textur
     meshes.push_back(mFlower); // 4
     meshes.push_back(mKoliber); //5
     meshes.push_back(mTerrain); //6 
+    meshes.push_back(playerObj); //7
+
+    //gdzie jest ziemia
+    groundMeshPtr = &meshes[0];
+
+    //RENDERING INSTANYCJNY
+    flowerMatrices.clear();
+    for(int i = 0; i < FLOWER_COUNT; i++) {
+        float x = (rand() % 2000 - 1000) / 10.0f; 
+        float z = (rand() % 2000 - 1000) / 10.0f;
+        
+        // Pobieramy wysokość
+        float y = GetHeight(x, z); 
+
+        float a = glm::radians((float)(rand() % 360));
+        float s = 0.3f + (rand() / (float)RAND_MAX) * 0.4f;
+
+        glm::mat4 m = glm::mat4(1.0f);
+        m = glm::translate(m, glm::vec3(x, y, z));
+        m = glm::rotate(m, a, glm::vec3(0.0f, 1.0f, 0.0f));
+        m = glm::scale(m, glm::vec3(s, s, s));
+        
+        flowerMatrices.push_back(m);
+    }
+
+    // Przygotuj siatkę kwiatka (meshes[4]) do instancjonowania
+    meshes[4].PrepareInstancing(flowerMatrices);
+
+
 
     textures.push_back(0); // 0
     textures.push_back(LoadTexture("textures/grass.png")); 
@@ -152,11 +253,13 @@ void InitializeResources(std::vector<CMesh>& meshes, std::vector<GLuint>& textur
     textures.push_back(LoadTexture("textures/brick.png")); 
     textures.push_back(LoadTexture("textures/flower32bit.png"));
     textures.push_back(LoadTexture("textures/sand.png"));
+    textures.push_back(LoadTexture("textures/lego.png"));
 }
 
 void BuildScene(std::vector<SceneObject>& scene, std::vector<CMesh>& meshes, std::vector<GLuint>& textures) {
 
     // --- OBIEKT 1: PODŁOGA Z HEIGHTMAPY ---
+    /*
     SceneObject terrain;
     terrain.mesh = &meshes[6]; // Używamy mTerrain
     terrain.position = glm::vec3(0.0f, -22.0f, 0.0f); // Obniżamy nieco, by obiekty nie były pod ziemią
@@ -165,7 +268,18 @@ void BuildScene(std::vector<SceneObject>& scene, std::vector<CMesh>& meshes, std
     terrain.color = glm::vec3(1.0f, 0.0f, 1.0f); 
     terrain.idTexture = textures[5]; // Używamy piasku
     terrain.mat = {0.2f, 0.8f, 0.1f, 2.0f}; // Materiał matowy
-    scene.push_back(terrain);
+    scene.push_back(terrain);*/
+
+    // --- OBIEKT 1: NOWA PODLOGA ---
+    SceneObject ground;
+    ground.mesh = &meshes[0];
+    ground.idTexture = textures[5];
+    ground.position = glm::vec3(0.0f, 0.0f, 0.0f); 
+    ground.scale = glm::vec3(4.0f, 1.0f, 4.0f);    //powiekszenie razy 2
+    ground.rotation = glm::vec3(0.0f, 0.0f, 0.0f);
+    ground.color = glm::vec3(1.0f);
+    ground.mat = {0.2f, 0.8f, 0.1f, 32.0f};   // Parametry materiału
+    scene.push_back(ground);
 
     // --- OBIEKT 2: Sześcian ---
     SceneObject box;
@@ -212,7 +326,7 @@ void BuildScene(std::vector<SceneObject>& scene, std::vector<CMesh>& meshes, std
     suzanne.idTexture = 0;
     suzanne.mat = {0.2f, 0.8f, 0.5f, 32.0f}; // Złoty połysk
     scene.push_back(suzanne);
-
+    /*
     // --- OBIEKT 5: KWIATY ---
     SceneObject flower1;
     flower1.mesh = &meshes[4]; 
@@ -227,7 +341,7 @@ void BuildScene(std::vector<SceneObject>& scene, std::vector<CMesh>& meshes, std
     SceneObject flower2 = flower1;
     flower2.position = glm::vec3(-3.0f, -0.5f, 3.0f);
     flower2.rotation = glm::vec3(0.0f, 1.57f, 0.0f); 
-    scene.push_back(flower2);
+    scene.push_back(flower2);*/
 
     // --- OBIEKT 6: KOLIBER ---
     SceneObject koliber;
@@ -239,6 +353,19 @@ void BuildScene(std::vector<SceneObject>& scene, std::vector<CMesh>& meshes, std
     koliber.idTexture = 0;
     koliber.mat = {0.2f, 0.8f, 1.0f, 128.0f}; 
     scene.push_back(koliber);
+
+    // --- OBIEKT 7: LUDZIK ---
+    SceneObject playerObj;
+    playerObj.mesh = &meshes[7];      
+    playerObj.idTexture = textures[6]; 
+    playerObj.scale = glm::vec3(0.5f); // Ludziki często są duże w OBJ, przeskaluj
+    playerObj.color = glm::vec3(1.0f);
+    playerObj.mat = {0.2f, 0.8f, 0.5f, 32.0f};
+    // playerObj.position i rotation będziemy aktualizować co klatkę
+    scene.push_back(playerObj);
+
+    // Zapamiętaj indeks tego obiektu w wektorze scene, np.:
+    int playerSceneIndex = scene.size() - 1;
 
 }
 
@@ -252,17 +379,19 @@ void LoadHeightmap(const char* filename, std::vector<TerrainVertex>& vertices, s
         return;
     }
 
-    float yScale = 0.2f; // Jak wysokie mają być góry
-    float xzScale = 1.0f; // Odstęp między punktami
+    hmWidth = width; 
+    hmHeight = height;
+    globalHeights.clear();
 
     // 1. Generowanie wierzchołków
     for (int z = 0; z < height; z++) {
         for (int x = 0; x < width; x++) {
-            float y = data[z * width + x] * yScale;
+            float y = data[z * width + x] * hmYScale;
+            globalHeights.push_back(y);
             
             TerrainVertex v;
             // Centrujemy teren, odejmując połowę szerokości
-            v.position = glm::vec3((x - width/2.0f) * xzScale, y, (z - height/2.0f) * xzScale);
+            v.position = glm::vec3((x - width/2.0f) * hmXZScale, y, (z - height/2.0f) * hmXZScale);
             v.texCoords = glm::vec2((float)x / width, (float)z / height);
             v.normal = glm::vec3(0.0f, 1.0f, 0.0f); // Uproszczony normal (do poprawy później dla światła)
             
@@ -337,4 +466,24 @@ void GenerateNormals(std::vector<TerrainVertex>& vertices, int width, int height
             vertices[z * width + x].normal = glm::normalize(normal);
         }
     }
+}
+//instancjonowanie 
+void CMesh::PrepareInstancing(const std::vector<glm::mat4>& matrices) {
+    this->instanceCount = (int)matrices.size();
+    this->isInstanced = true;
+
+    glBindVertexArray(idVAO);
+
+    glGenBuffers(1, &idVBO_instance);
+    glBindBuffer(GL_ARRAY_BUFFER, idVBO_instance);
+    glBufferData(GL_ARRAY_BUFFER, matrices.size() * sizeof(glm::mat4), &matrices[0][0][0], GL_STATIC_DRAW);
+
+    // Rejestracja macierzy w slotach 3, 4, 5, 6
+    for (int i = 0; i < 4; i++) {
+        glEnableVertexAttribArray(3 + i);
+        glVertexAttribPointer(3 + i, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(sizeof(glm::vec4) * i));
+        glVertexAttribDivisor(3 + i, 1); // To jest klucz do sukcesu
+    }
+
+    glBindVertexArray(0);
 }

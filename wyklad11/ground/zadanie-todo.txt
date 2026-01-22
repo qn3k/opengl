@@ -1,0 +1,31 @@
+// ---------------------------------------
+// Implementacja podloza oraz poruszania sie
+// postacia po scenie
+// ---------------------------------------
+
+Zadanie: popraw ten prawie gotowy projekt.
+
+Odkomentowuj wybrane fragmenty kodu w ponizszej
+kolejnosci.
+
+
+KROK 1. W pliku .cpp dodaj naglowki oraz utworz obiekt
+klasy CPlayer oraz CGround.
+
+
+KROK 2. W Initialize() zainicjalizuj obiekty klasy
+CGround oraz CPlayer.
+
+
+KROK 3. W DisplayScene() trzeba wyrenderowac obiekt
+metoda Draw() z klasy CPlayer
+
+
+KROK 4. Wywolajmy metody Move i Rotate naszej postaci
+w funkcji do obslugi klawiatury, abysmy mogli sie
+poruszac po scenie
+
+
+KROK 5. Poprawimy polozenie obiektu drzewa tak, aby stalo
+dokladnie na siatce sceny wyliczajac skladowa Y metoda
+getY() z klasy CGround.
