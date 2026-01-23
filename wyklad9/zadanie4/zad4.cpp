@@ -183,6 +183,27 @@ void SetupLights() {
 }
 
 void DrawWorld(glm::mat4 projection, glm::mat4 view, glm::vec3 camPos) {
+   
+    glm::mat4 viewStatic = glm::mat4(glm::mat3(view)); // Usuwamy translację
+
+    glActiveTexture(GL_TEXTURE1);
+    if (currentSkybox == 0) glBindTexture(GL_TEXTURE_CUBE_MAP, skybox1->getTextureID());
+    else glBindTexture(GL_TEXTURE_CUBE_MAP, skybox2->getTextureID());
+    glUniform1i(glGetUniformLocation(idProgram, "tex_skybox"), 1);
+
+    glDepthFunc(GL_LEQUAL);
+    glDepthMask(GL_FALSE);
+
+    if (currentSkybox == 0 && skybox1) {
+        skybox1->draw(projection, viewStatic, 100.0f); // Zwiększyłem dystans na 100
+    } 
+    else if (currentSkybox == 1 && skybox2) {
+        skybox2->draw(projection, viewStatic, 100.0f);
+    }
+
+    glDepthMask(GL_TRUE);
+    glDepthFunc(GL_LESS);
+
     glUseProgram(idProgram);
     
     // Pobieramy lokalizacje zmiennych, których wcześniej brakowało
@@ -323,29 +344,6 @@ void DisplayScene() {
     //glm::vec3 cameraOffset = glm::vec3(-5.0f * sin(myPlayer.rotationY), 3.0f, -5.0f * cos(myPlayer.rotationY));
     //glm::vec3 cameraPos = myPlayer.position + cameraOffset;
     //glm::mat4 matView = glm::lookAt(cameraPos, myPlayer.position + glm::vec3(0, 1.5f, 0), glm::vec3(0, 1, 0));
-    
-    glm::mat4 viewStatic = glm::mat4(glm::mat3(matView));
-
-    GLint loc_bUseTexture = glGetUniformLocation(idProgram, "bUseTexture"); //tekstury
-    GLint locTiling = glGetUniformLocation(idProgram, "uTiling"); //heightmap
-
-    glActiveTexture(GL_TEXTURE1);
-    if (currentSkybox == 0) glBindTexture(GL_TEXTURE_CUBE_MAP, skybox1->getTextureID());
-    else glBindTexture(GL_TEXTURE_CUBE_MAP, skybox2->getTextureID());
-    glUniform1i(glGetUniformLocation(idProgram, "tex_skybox"), 1);
-
-    glDepthFunc(GL_LEQUAL);
-    glDepthMask(GL_FALSE);
-
-    if (currentSkybox == 0 && skybox1) {
-        skybox1->draw(matProj, viewStatic, 40.0f);
-    } 
-    else if (currentSkybox == 1 && skybox2) {
-        skybox2->draw(matProj, viewStatic, 40.0f);
-    }
-
-    glDepthMask(GL_TRUE);
-    glDepthFunc(GL_LESS);
 
     DrawWorld(matProj, matView, cameraPos);
 
