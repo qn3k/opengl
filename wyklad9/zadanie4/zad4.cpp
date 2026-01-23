@@ -13,8 +13,8 @@
 #include <glm/gtc/type_ptr.hpp>
 
 // Musimy zadeklarować matProj tutaj, bo utilities.hpp go używa
-int windowWidth = 800;
-int windowHeight = 600;
+int windowWidth = 1600;
+int windowHeight = 900;
 const char* windowTitle = "Skybox v1";
 glm::mat4 matProj;
 glm::vec3 lightColor = glm::vec3(1.0f, 1.0f, 1.0f); // Domyślnie białe
@@ -65,7 +65,24 @@ std::vector<GLuint> textures;
 bool keys[1024];
 int playerIdx = -1;
 
-GLuint fbo, textureBuffer, rbo;
+// Stałe dla czytelności (jak w przykładzie który Ci się podobał)
+enum { SCREEN = 0 }; 
+GLuint idVAO[1]; 
+GLint loc_matPVM, loc_tex;
+
+// Parametry FBO (Minimapy)
+GLuint fbo, idTextureBuffer, rbo;
+int bufferWidth = 1600;
+int bufferHeight = 900;
+
+GLfloat vertices_pos[] = {
+    -1.0f, -1.0f, 0.0f,
+     1.0f, -1.0f, 0.0f,
+     1.0f,  1.0f, 0.0f,
+     1.0f,  1.0f, 0.0f,
+    -1.0f,  1.0f, 0.0f,
+    -1.0f, -1.0f, 0.0f,
+};
 
 void setupFBO() {
     // 1. Tworzymy Framebuffer
@@ -73,14 +90,14 @@ void setupFBO() {
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 
     // 2. Tworzymy teksturę, do której będziemy renderować
-    glGenTextures(1, &textureBuffer);
-    glBindTexture(GL_TEXTURE_2D, textureBuffer);
+    glGenTextures(1, &idTextureBuffer);
+    glBindTexture(GL_TEXTURE_2D, idTextureBuffer);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 800, 600, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     // Podpinamy teksturę do FBO jako załącznik koloru
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureBuffer, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, idTextureBuffer, 0);
 
     // 3. Tworzymy Renderbuffer dla Depth i Stencil (żeby działał Depth Test)
     glGenRenderbuffers(1, &rbo);
@@ -95,91 +112,6 @@ void setupFBO() {
         std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0); // Wracamy do domyślnego bufora
-}
-
-void Initialize() {
-
-    glClearColor(0.1f, 0.1f, 0.1f, 1.0f); 
-    glEnable(GL_DEPTH_TEST);
-    
-    // Włączenie blendowania dla przezroczystości tekstur kwiatów
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-    // 1. Szadery
-    idProgram = glCreateProgram();
-    glAttachShader(idProgram, LoadShader(GL_VERTEX_SHADER, "shaders/vertex.glsl"));
-    glAttachShader(idProgram, LoadShader(GL_FRAGMENT_SHADER, "shaders/fragment.glsl"));
-    LinkAndValidateProgram(idProgram);
-
-    //Przeniesienie ladowania obiektow do zewnetrznych funkcji
-    InitializeResources(meshes, textures);
-    BuildScene(scene, meshes, textures);
-    for(int i=0; i<scene.size(); i++) {
-        if(scene[i].mesh == &meshes[7]) { 
-            playerIdx = i;
-            break;
-        }
-    }
-    myGround.Init(); 
-    myPlayer.Init(&myGround);
-    myPlayer.position.y = myGround.getY(glm::vec2(myPlayer.position.x, myPlayer.position.z));
-
-    // Konfiguracja Skyboxa
-    std::vector<std::string> faces1 = {"skybox1/posx.jpg","skybox1/negx.jpg","skybox1/posy.jpg","skybox1/negy.jpg","skybox1/posz.jpg","skybox1/negz.jpg"};
-    std::vector<std::string> faces2 = {"skybox2/posx.jpg","skybox2/negx.jpg","skybox2/posy.jpg","skybox2/negy.jpg","skybox2/posz.jpg","skybox2/negz.jpg"};
-
-    skybox1 = new Skybox(faces1, "shaders/skybox-vertex.glsl", "shaders/skybox-fragment.glsl");
-    skybox2 = new Skybox(faces2, "shaders/skybox-vertex.glsl", "shaders/skybox-fragment.glsl");
-    
-    matProj = glm::perspective(glm::radians(80.0f), windowWidth/(float)windowHeight, 0.1f, 250.0f);
-}
-
-//sterowanie postacia
-void handleInput() {
-    float speed = 0.05f;
-    float rotSpeed = 0.03f;
-    if (keys[GLFW_KEY_W]) myPlayer.Move(speed);
-    if (keys[GLFW_KEY_S]) myPlayer.Move(-speed);
-    if (keys[GLFW_KEY_A]) myPlayer.Rotate(rotSpeed);
-    if (keys[GLFW_KEY_D]) myPlayer.Rotate(-rotSpeed);
-}
-
-void playerAnimation() {
-    // --- ANIMACJA LUDZIKA ---
-    // Sprawdź czy indeksy zostały znalezione, żeby nie wywalić programu
-    if (pIdx.body != -1 && pIdx.legR != -1 && pIdx.legL != -1) {
-        float t = glfwGetTime();
-        bool isMoving = keys[GLFW_KEY_W] || keys[GLFW_KEY_S];
-        float walkAngle = isMoving ? sin(t * 8.0f) * 0.6f : 0.0f;
-
-        glm::vec3 p = myPlayer.position;
-        float rotY = myPlayer.rotationY;
-
-        // Wszystkie części mają tę samą pozycję, bo mają wspólny pivot
-        scene[pIdx.body].position = p;
-        scene[pIdx.legR].position = p;
-        scene[pIdx.legL].position = p;
-
-        // Tors obraca się tylko wokół osi Y
-        scene[pIdx.body].rotation = glm::vec3(0.0f, rotY, 0.0f);
-
-        // Nogi: Muszą machać przód-tył (oś X) ORAZ obracać się tam gdzie gracz (oś Y)
-        scene[pIdx.legR].rotation = glm::vec3(0.0f, rotY, walkAngle); 
-        scene[pIdx.legL].rotation = glm::vec3(0.0f, rotY, -walkAngle);
-    }
-}
-
-//swiatla kolorowe
-void SetupLights() {
-    // Światło 1: Białe (krążące - to co już masz)
-    lights[0] = { glm::vec3(0, 3, 0), glm::vec3(1.0, 1.0, 1.0), 1.5f };
-    // Światło 2: Czerwone (stałe)
-    lights[1] = { glm::vec3(-4, 2, -4), glm::vec3(1.0, 0.0, 0.0), 1.2f };
-    // Światło 3: Zielone (stałe)
-    lights[2] = { glm::vec3(4, 2, -4), glm::vec3(0.0, 1.0, 0.0), 1.2f };
-    // Światło 4: Niebieskie (stałe)
-    lights[3] = { glm::vec3(0, 2, 4), glm::vec3(0.0, 0.0, 1.0), 1.2f };
 }
 
 void DrawWorld(glm::mat4 projection, glm::mat4 view, glm::vec3 camPos) {
@@ -307,12 +239,174 @@ void DrawWorld(glm::mat4 projection, glm::mat4 view, glm::vec3 camPos) {
     }
 }
 
+void RenderScene_to_Texture() {
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo); 
+    glViewport(0, 0, bufferWidth, bufferHeight);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    glm::mat4 miniProj = glm::ortho(-20.0f, 20.0f, -20.0f, 20.0f, 0.1f, 100.0f);
+    glm::mat4 miniView = glm::lookAt(myPlayer.position + glm::vec3(0, 50, 0), 
+                                     myPlayer.position, 
+                                     glm::vec3(0, 0, -1));
+
+    // Teraz kompilator widzi DrawWorld, bo jest wyżej w pliku
+    DrawWorld(miniProj, miniView, myPlayer.position + glm::vec3(0, 50, 0));
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void RenderScene_on_Screen(glm::mat4 projection, glm::mat4 view, glm::vec3 camPos) {
+    // --- KROK 1: RYSOWANIE ŚWIATA (CAŁY EKRAN) ---
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, windowWidth, windowHeight);
+    glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    // Rysujemy świat normalnie
+    DrawWorld(projection, view, camPos);
+
+    // --- KROK 2: RYSOWANIE MINIMAPY (TYLKO KWADRAT) ---
+    glDisable(GL_DEPTH_TEST); 
+    glUseProgram(idProgram);
+
+    // Macierz modelu dla minimapy (pozycja i skala w rogu)
+    glm::mat4 matModelMinimap = glm::mat4(1.0f);
+    matModelMinimap = glm::translate(matModelMinimap, glm::vec3(0.7f, 0.7f, 0.0f)); 
+    matModelMinimap = glm::scale(matModelMinimap, glm::vec3(0.25f)); 
+
+    // WAŻNE: Musimy zneutralizować macierze Proj i View dla minimapy,
+    // bo minimapa jest już zdefiniowana w NDC (-1 do 1)
+    glm::mat4 identity = glm::mat4(1.0f);
+    glUniformMatrix4fv(glGetUniformLocation(idProgram, "matProj"), 1, GL_FALSE, glm::value_ptr(identity));
+    glUniformMatrix4fv(glGetUniformLocation(idProgram, "matView"), 1, GL_FALSE, glm::value_ptr(identity));
+    glUniformMatrix4fv(glGetUniformLocation(idProgram, "matModel"), 1, GL_FALSE, glm::value_ptr(matModelMinimap));
+
+    // Wyłączamy oświetlenie dla minimapy (żeby nie była czarna/dziwna)
+    glUniform1i(glGetUniformLocation(idProgram, "useLighting"), 0);
+    glUniform1f(glGetUniformLocation(idProgram, "uTiling"), 1.0f);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, idTextureBuffer); // Tekstura z FBO
+    glUniform1i(glGetUniformLocation(idProgram, "uTextureSampler"), 0);
+    glUniform1i(glGetUniformLocation(idProgram, "bUseTexture"), 1);
+
+    glBindVertexArray(idVAO[SCREEN]);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glBindVertexArray(0);
+
+    glEnable(GL_DEPTH_TEST);
+}
+
+void Initialize() {
+
+    glClearColor(0.1f, 0.1f, 0.1f, 1.0f); 
+    glEnable(GL_DEPTH_TEST);
+    
+    // Włączenie blendowania dla przezroczystości tekstur kwiatów
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    // 1. Szadery
+    idProgram = glCreateProgram();
+    glAttachShader(idProgram, LoadShader(GL_VERTEX_SHADER, "shaders/vertex.glsl"));
+    glAttachShader(idProgram, LoadShader(GL_FRAGMENT_SHADER, "shaders/fragment.glsl"));
+    LinkAndValidateProgram(idProgram);
+
+    //Przeniesienie ladowania obiektow do zewnetrznych funkcji
+    InitializeResources(meshes, textures);
+    BuildScene(scene, meshes, textures);
+    for(int i=0; i<scene.size(); i++) {
+        if(scene[i].mesh == &meshes[7]) { 
+            playerIdx = i;
+            break;
+        }
+    }
+    myGround.Init(); 
+    myPlayer.Init(&myGround);
+    myPlayer.position.y = myGround.getY(glm::vec2(myPlayer.position.x, myPlayer.position.z));
+
+    // Konfiguracja Skyboxa
+    std::vector<std::string> faces1 = {"skybox1/posx.jpg","skybox1/negx.jpg","skybox1/posy.jpg","skybox1/negy.jpg","skybox1/posz.jpg","skybox1/negz.jpg"};
+    std::vector<std::string> faces2 = {"skybox2/posx.jpg","skybox2/negx.jpg","skybox2/posy.jpg","skybox2/negy.jpg","skybox2/posz.jpg","skybox2/negz.jpg"};
+
+    skybox1 = new Skybox(faces1, "shaders/skybox-vertex.glsl", "shaders/skybox-fragment.glsl");
+    skybox2 = new Skybox(faces2, "shaders/skybox-vertex.glsl", "shaders/skybox-fragment.glsl");
+    
+    matProj = glm::perspective(glm::radians(80.0f), windowWidth/(float)windowHeight, 0.1f, 250.0f);
+
+    // Inicjalizacja kwadratu dla minimapy (SCREEN)
+    glGenVertexArrays(1, &idVAO[SCREEN]);
+    glBindVertexArray(idVAO[SCREEN]);
+    GLuint vbo_pos;
+    glGenBuffers(1, &vbo_pos);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo_pos);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices_pos), vertices_pos, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, NULL);
+    glEnableVertexAttribArray(0);
+
+    // Dodajemy współrzędne UV dla kwadratu (żeby tekstura z FBO się wyświetliła)
+    GLfloat screen_uv[] = { 0,0, 1,0, 1,1, 1,1, 0,1, 0,0 };
+    GLuint vbo_uv;
+    glGenBuffers(1, &vbo_uv);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo_uv);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(screen_uv), screen_uv, GL_STATIC_DRAW);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, NULL);
+    glEnableVertexAttribArray(1);
+    glBindVertexArray(0);
+}
+
+//sterowanie postacia
+void handleInput() {
+    float speed = 0.05f;
+    float rotSpeed = 0.03f;
+    if (keys[GLFW_KEY_W]) myPlayer.Move(speed);
+    if (keys[GLFW_KEY_S]) myPlayer.Move(-speed);
+    if (keys[GLFW_KEY_A]) myPlayer.Rotate(rotSpeed);
+    if (keys[GLFW_KEY_D]) myPlayer.Rotate(-rotSpeed);
+}
+
+void playerAnimation() {
+    // --- ANIMACJA LUDZIKA ---
+    // Sprawdź czy indeksy zostały znalezione, żeby nie wywalić programu
+    if (pIdx.body != -1 && pIdx.legR != -1 && pIdx.legL != -1) {
+        float t = glfwGetTime();
+        bool isMoving = keys[GLFW_KEY_W] || keys[GLFW_KEY_S];
+        float walkAngle = isMoving ? sin(t * 8.0f) * 0.6f : 0.0f;
+
+        glm::vec3 p = myPlayer.position;
+        float rotY = myPlayer.rotationY;
+
+        // Wszystkie części mają tę samą pozycję, bo mają wspólny pivot
+        scene[pIdx.body].position = p;
+        scene[pIdx.legR].position = p;
+        scene[pIdx.legL].position = p;
+
+        // Tors obraca się tylko wokół osi Y
+        scene[pIdx.body].rotation = glm::vec3(0.0f, rotY, 0.0f);
+
+        // Nogi: Muszą machać przód-tył (oś X) ORAZ obracać się tam gdzie gracz (oś Y)
+        scene[pIdx.legR].rotation = glm::vec3(0.0f, rotY, walkAngle); 
+        scene[pIdx.legL].rotation = glm::vec3(0.0f, rotY, -walkAngle);
+    }
+}
+
+//swiatla kolorowe
+void SetupLights() {
+    // Światło 1: Białe (krążące - to co już masz)
+    lights[0] = { glm::vec3(0, 3, 0), glm::vec3(1.0, 1.0, 1.0), 1.5f };
+    // Światło 2: Czerwone (stałe)
+    lights[1] = { glm::vec3(-4, 2, -4), glm::vec3(1.0, 0.0, 0.0), 1.2f };
+    // Światło 3: Zielone (stałe)
+    lights[2] = { glm::vec3(4, 2, -4), glm::vec3(0.0, 1.0, 0.0), 1.2f };
+    // Światło 4: Niebieskie (stałe)
+    lights[3] = { glm::vec3(0, 2, 4), glm::vec3(0.0, 0.0, 1.0), 1.2f };
+}
+
 void DisplayScene() {
 
     handleInput();
     playerAnimation();
-
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     //obsluga kamery wokol srodka
     //glm::mat4 matView = UpdateViewMatrix(); 
@@ -339,13 +433,17 @@ void DisplayScene() {
     glm::vec3 lookAtPoint = myPlayer.position + glm::vec3(0.0f, 1.0f, 0.0f);
 
     glm::mat4 matView = glm::lookAt(cameraPos, lookAtPoint, glm::vec3(0.0f, 1.0f, 0.0f));
-    glUniformMatrix4fv(glGetUniformLocation(idProgram, "matView"), 1, GL_FALSE, glm::value_ptr(matView));
+    //glUniformMatrix4fv(glGetUniformLocation(idProgram, "matView"), 1, GL_FALSE, glm::value_ptr(matView));
 
     //glm::vec3 cameraOffset = glm::vec3(-5.0f * sin(myPlayer.rotationY), 3.0f, -5.0f * cos(myPlayer.rotationY));
     //glm::vec3 cameraPos = myPlayer.position + cameraOffset;
     //glm::mat4 matView = glm::lookAt(cameraPos, myPlayer.position + glm::vec3(0, 1.5f, 0), glm::vec3(0, 1, 0));
 
-    DrawWorld(matProj, matView, cameraPos);
+    // 2. Render pozaekranowy (zawsze pierwszy!)
+    RenderScene_to_Texture();
+
+    // 3. Render właściwy
+    RenderScene_on_Screen(matProj, matView, cameraPos);
 
     // --- START IMGUI FRAME ---
     ImGui_ImplOpenGL3_NewFrame();
@@ -490,7 +588,8 @@ int main() {
 
     Initialize();
     SetupLights();
-    
+    setupFBO();
+
     while (!glfwWindowShouldClose(window)) {
         DisplayScene();
         glfwSwapBuffers(window);
