@@ -1,54 +1,20 @@
-// ---------------------------------------------------
-// Funkcje pomocnicze, w szczegolnosci
-// 1. funkcja do obslugi widoku sceny
-// 2. funkcje zwrotne GLFW
-// 3. funkcje do obslugi plikow shaderow
-// ---------------------------------------------------
-#ifndef __UTILITIES_HPP
-#define __UTILITIES_HPP
-
+#include "utilities.hpp"
 #include <stdio.h>
-#include <glad/glad.h>
-#include <GLFW/glfw3.h>
-#include <iostream>
-#include <vector>
-#include <cmath>
-
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
-
-// ---------------------------------------------------
-// Makro do znajdowania prostych bledow opengla
-// ---------------------------------------------------
-#define __CHECK_FOR_ERRORS 	{GLenum errCode; if ((errCode = glGetError()) != GL_NO_ERROR) printf("Error code %d in the file %s at line %d !\n", errCode, __FILE__,  __LINE__);}
-
-
-// Okno aplikacji
-extern int windowWidth, windowHeight;
-extern const char *windowTitle;
-extern GLFWwindow* window;
-
-// Macierz rzutowania ustalana w funkcji zwrotnej
-// framebuffer_size_callback
-extern glm::mat4 matProj;
+#include <imgui.h>
 
 // Zmienne do kontroli obrotu kamery
-GLfloat cameraRotateX = 0.3f;
-GLfloat cameraRotateY = 0.0f;
+GLfloat CameraRotate_x = 0.0f;
+GLfloat CameraRotate_y = 0.0f;
 
 // Zmienne do kontroli pozycji kamery
-GLfloat cameraTranslateX = 0.0f;
-GLfloat cameraTranslateY = 0.0f;
-GLfloat cameraTranslateZ = -8.0f;
-
+GLfloat CameraTranslate_x = 0.0f;
+GLfloat CameraTranslate_y = 0.0f;
+GLfloat CameraTranslate_z = -2.0f;
 
 // Zmienne do obslugi myszy
-double __mouse_buttonX;
-double __mouse_buttonY;
-bool __mouse_press = false;
-int  __mouse_button = 0;
-
+double __mouse_buttonX, __mouse_buttonY;
+bool Mouse_Press = false;
+int  Mouse_Button = 0;
 
 // --------------------------------------------------------------
 // Funkcja zwraca macierz widoku dla kamery
@@ -56,9 +22,9 @@ int  __mouse_button = 0;
 glm::mat4 UpdateViewMatrix()
 {
 	glm::mat4 matView = glm::mat4x4( 1.0 );
-	matView = glm::translate( matView, glm::vec3( cameraTranslateX, cameraTranslateY, cameraTranslateZ) );
-	matView = glm::rotate( matView, cameraRotateX, glm::vec3( 1.0f, 0.0f, 0.0f ) );
-	matView = glm::rotate( matView, cameraRotateY, glm::vec3( 0.0f, 1.0f, 0.0f ) );
+	matView = glm::translate( matView, glm::vec3( CameraTranslate_x, CameraTranslate_y, CameraTranslate_z) );
+	matView = glm::rotate( matView, CameraRotate_x, glm::vec3( 1.0f, 0.0f, 0.0f ) );
+	matView = glm::rotate( matView, CameraRotate_y, glm::vec3( 0.0f, 1.0f, 0.0f ) );
 
 	return matView;
 }
@@ -107,64 +73,48 @@ glm::vec3 ExtractCameraPos(const glm::mat4 & a_modelView)
 
 
 // ---------------------------------------------------
-// funkcja zwrotna do obslugi klawiatury
-static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
-{
-	extern bool isOffscreenRendering;
-
-	if (action == GLFW_PRESS)
-	{
-		switch(key)
-		{
-		case GLFW_KEY_ESCAPE:
-			glfwSetWindowShouldClose(window, GLFW_TRUE);
-			break;
-
-		case GLFW_KEY_SPACE:
-			isOffscreenRendering = !isOffscreenRendering;
-			break;
-
-		default:
-			printf("Nacisnieto klawisz %d \n", key);
-			break;
-		}
-	}
-}
-
-// ---------------------------------------------------
 // funkcja zwrotna do obslugi zmiany rozmiaru framebuffera
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
-	windowWidth = width;
-	windowHeight = height;
+    windowWidth = width;
+    windowHeight = height;
 
-	// Viewport
-	int display_w, display_h;
-	glfwGetFramebufferSize(window, &display_w, &display_h);
-	glViewport(0, 0, display_w, display_h);
+    if (windowHeight != 0)
+        matProj = glm::perspective(glm::radians(80.0f), (float)windowWidth / (float)windowHeight, 0.1f, 50.0f);
 
-	// Macierz rzutowania perspektywicznego
-	matProj = glm::perspective(glm::radians(70.0f), width/(float)height, 0.1f, 100.0f );
+    glViewport(0, 0, width, height);
 }
+
+
 
 // ---------------------------------------------------
 // funkcja zwrotna do obslugi scrolla myszy
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
-	cameraTranslateZ += yoffset;
+    CameraTranslate_z += yoffset;
 }
 
 // --------------------------------------------------------------
 // funkcja zwrotna do obslugi ruchu kursora myszy
-static void cursor_position_callback(GLFWwindow* window, double xpos, double ypos)
+void cursor_position_callback(GLFWwindow* window, double xpos, double ypos)
 {
+	if (ImGui::GetIO().WantCaptureMouse) return; 
+	// Jeśli myszka jest nad oknem ImGui, nie ruszaj kamerą
 
-	if (__mouse_press && __mouse_button == GLFW_MOUSE_BUTTON_LEFT)
+	if (Mouse_Press && Mouse_Button == GLFW_MOUSE_BUTTON_LEFT)
 	{
-		cameraRotateX += 2.0*(ypos - __mouse_buttonY)/(float)windowWidth;
-		cameraRotateY += 2.0*(xpos - __mouse_buttonX)/(float)windowHeight;
-		__mouse_buttonX = xpos;
-		__mouse_buttonY = ypos;
+		CameraRotate_x += (ypos - __mouse_buttonY)/(float)windowWidth;
+		CameraRotate_y += (xpos - __mouse_buttonX)/(float)windowHeight;
+        __mouse_buttonX = xpos;
+        __mouse_buttonY = ypos;
+	}
+
+	if (Mouse_Press && Mouse_Button == GLFW_MOUSE_BUTTON_RIGHT)
+	{
+		CameraRotate_x -= 2*(ypos - __mouse_buttonY)/(float)windowWidth;
+		CameraRotate_y += 2*(__mouse_buttonX - xpos)/(float)windowHeight;
+        __mouse_buttonX = xpos;
+        __mouse_buttonY = ypos;
 	}
 }
 
@@ -175,60 +125,39 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 {
     if (action == GLFW_PRESS)
 	{
-		__mouse_press = true;
-		__mouse_button = button;
+		Mouse_Press = true;
+		Mouse_Button = button;
 
 		glfwGetCursorPos(window, &__mouse_buttonX, &__mouse_buttonY);
 	}
 
 	if (action == GLFW_RELEASE)
 	{
-		__mouse_press = false;
+		Mouse_Press = false;
 	}
+}
+
+// ---------------------------------------------------
+// funkcja zwrotna do obslugi klawiatury
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+        glfwSetWindowShouldClose(window, GLFW_TRUE);
+
+    if (action == GLFW_PRESS)
+    {
+        printf("Nacisnieto klawisz %d \n", key);
+    }
+
 }
 
 
 // ---------------------------------------------------
 // funkcja zwrotna do obslugi bledow glfw
-static void error_callback(int error, const char* description)
+void error_callback(int error, const char* description)
 {
-	fprintf(stderr, "Error: %s\n", description);
-}
+    fprintf(stderr, "Error: %s\n", description);
 
-
-// ---------------------------------------------
-// Inicjalizacja kontekstu OpenGL i GLFW
-void Initialize_GLFW(GLFWwindow* &window)
-{
-	// Funkcja zwrotna do bledow
-	glfwSetErrorCallback(error_callback);
-	// Inicjalizacja glfw
-	if (!glfwInit()) exit(EXIT_FAILURE);
-	// Ustalenie wersji OpenGL na 4.5
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
-	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-	#ifdef __APPLE__
-	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-	#endif
-
-	window = glfwCreateWindow((int)(windowWidth), (int)(windowHeight), windowTitle, nullptr, nullptr);
-	if (window == nullptr) exit(1);
-	glfwMakeContextCurrent(window);
-	glfwSwapInterval(1); // vsync
-	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
-	{
-		printf("Failed to initialize GLAD\n");
-		exit(-1);
-	}
-
-	// Rejestracja funkcji zwrotnych
-	// do obslugi zdarzen
-	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-	glfwSetKeyCallback(window, key_callback);
-	glfwSetCursorPosCallback(window, cursor_position_callback);
-	glfwSetMouseButtonCallback(window, mouse_button_callback);
-	glfwSetScrollCallback(window, scroll_callback);
 }
 
 // ---------------------------------------------
@@ -253,40 +182,23 @@ unsigned long getFileLength(const char *filename)
 
 
 // ---------------------------------------------
-GLchar * LoadShaderFile(const char* filename)
-{
-	FILE *file = fopen(filename, "r");
-	if (file == NULL) {
-		fprintf(stderr, "Nie moge otworzyc pliku %s!\n", filename);
-		exit(1);
-	}
+GLchar* LoadShaderFile(const char* filename) {
+    FILE* file = fopen(filename, "rb"); // Tryb binarny jest bezpieczniejszy
+    if (file == NULL) {
+        fprintf(stderr, "Nie mozna otworzyc: %s\n", filename);
+        exit(1);
+    }
 
-	unsigned long fileSize;
+    fseek(file, 0, SEEK_END);
+    unsigned long fileSize = ftell(file);
+    fseek(file, 0, SEEK_SET);
 
-	fseek(file, 0, SEEK_END);
-	fileSize = ftell(file);
-	fseek(file, 0, SEEK_SET);
+    GLchar* ShaderSource = new GLchar[fileSize + 1];
+    fread(ShaderSource, 1, fileSize, file);
+    ShaderSource[fileSize] = '\0'; // Ręczne zamknięcie stringa
 
-	if (fileSize == 0) {
-		printf("Plik %s jest pusty!\n", filename);
-		exit(1);
-	};
-
-	GLchar *ShaderSource = new GLchar[fileSize + 1];
-	if (ShaderSource == NULL) {
-		printf("Nie moge zaalokowac %ld bajtow \n", fileSize + 1);
-		exit(1);
-	}
-
-	int bytesRead = 0;
-	char c;
-	while ((c = fgetc(file)) != EOF && bytesRead < fileSize - 1) {
-		ShaderSource[bytesRead++] = c;
-	}
-	ShaderSource[bytesRead] = '\0';
-
-	fclose(file);
-	return ShaderSource;
+    fclose(file);
+    return ShaderSource;
 }
 
 // ---------------------------------------
@@ -362,6 +274,3 @@ void LinkAndValidateProgram(GLuint program)
 	glValidateProgram( program );
 	CheckForErrors_Program(program, GL_VALIDATE_STATUS);
 }
-
-#endif
-
