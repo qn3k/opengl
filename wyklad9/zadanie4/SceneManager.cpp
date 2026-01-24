@@ -199,9 +199,12 @@ void InitializeResources(std::vector<CMesh>& meshes, std::vector<GLuint>& textur
     mMonkey.Load("obj/monkey.obj");
     mKoliber.Load("obj/koliber.obj");
     playerObj.Load("obj/lego.obj"); 
-    playerBody.Load("obj/lego_body.obj"); 
-    playerLegR.Load("obj/lego_leg_r.obj"); 
-    playerLegL.Load("obj/lego_leg_l.obj"); 
+    //playerBody.Load("obj/lego_body.obj"); 
+    //playerLegR.Load("obj/lego_leg_r.obj"); 
+    //playerLegL.Load("obj/lego_leg_l.obj"); 
+    playerBody.Load("obj/cialko.obj"); 
+    playerLegR.Load("obj/noga_prawa.obj"); 
+    playerLegL.Load("obj/noga_lewa.obj"); 
     mFlower = CMesh::CreateFlowerMesh();
 
     //do heightmapa

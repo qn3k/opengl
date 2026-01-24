@@ -45,6 +45,7 @@ Skybox* skybox1 = nullptr;
 Skybox* skybox2 = nullptr;
 int currentSkybox = 0;
 const int FLOWER_COUNT = 20;
+bool showMinimap = true; // Flaga widoczności minimapy
 
 // --- STRUKTURA ŚWIATŁA ---
 struct PointLight {
@@ -267,35 +268,37 @@ void RenderScene_on_Screen(glm::mat4 projection, glm::mat4 view, glm::vec3 camPo
     DrawWorld(projection, view, camPos);
 
     // --- KROK 2: RYSOWANIE MINIMAPY (TYLKO KWADRAT) ---
-    glDisable(GL_DEPTH_TEST); 
-    glUseProgram(idProgram);
+    if (showMinimap) {
+        glDisable(GL_DEPTH_TEST); 
+        glUseProgram(idProgram);
 
-    // Macierz modelu dla minimapy (pozycja i skala w rogu)
-    glm::mat4 matModelMinimap = glm::mat4(1.0f);
-    matModelMinimap = glm::translate(matModelMinimap, glm::vec3(0.7f, 0.7f, 0.0f)); 
-    matModelMinimap = glm::scale(matModelMinimap, glm::vec3(0.25f)); 
+        // Macierz modelu dla minimapy (pozycja i skala w rogu)
+        glm::mat4 matModelMinimap = glm::mat4(1.0f);
+        matModelMinimap = glm::translate(matModelMinimap, glm::vec3(0.7f, 0.7f, 0.0f)); 
+        matModelMinimap = glm::scale(matModelMinimap, glm::vec3(0.25f)); 
 
-    // WAŻNE: Musimy zneutralizować macierze Proj i View dla minimapy,
-    // bo minimapa jest już zdefiniowana w NDC (-1 do 1)
-    glm::mat4 identity = glm::mat4(1.0f);
-    glUniformMatrix4fv(glGetUniformLocation(idProgram, "matProj"), 1, GL_FALSE, glm::value_ptr(identity));
-    glUniformMatrix4fv(glGetUniformLocation(idProgram, "matView"), 1, GL_FALSE, glm::value_ptr(identity));
-    glUniformMatrix4fv(glGetUniformLocation(idProgram, "matModel"), 1, GL_FALSE, glm::value_ptr(matModelMinimap));
+        // WAŻNE: Musimy zneutralizować macierze Proj i View dla minimapy,
+        // bo minimapa jest już zdefiniowana w NDC (-1 do 1)
+        glm::mat4 identity = glm::mat4(1.0f);
+        glUniformMatrix4fv(glGetUniformLocation(idProgram, "matProj"), 1, GL_FALSE, glm::value_ptr(identity));
+        glUniformMatrix4fv(glGetUniformLocation(idProgram, "matView"), 1, GL_FALSE, glm::value_ptr(identity));
+        glUniformMatrix4fv(glGetUniformLocation(idProgram, "matModel"), 1, GL_FALSE, glm::value_ptr(matModelMinimap));
 
-    // Wyłączamy oświetlenie dla minimapy (żeby nie była czarna/dziwna)
-    glUniform1i(glGetUniformLocation(idProgram, "useLighting"), 0);
-    glUniform1f(glGetUniformLocation(idProgram, "uTiling"), 1.0f);
+        // Wyłączamy oświetlenie dla minimapy (żeby nie była czarna/dziwna)
+        glUniform1i(glGetUniformLocation(idProgram, "useLighting"), 0);
+        glUniform1f(glGetUniformLocation(idProgram, "uTiling"), 1.0f);
 
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, idTextureBuffer); // Tekstura z FBO
-    glUniform1i(glGetUniformLocation(idProgram, "uTextureSampler"), 0);
-    glUniform1i(glGetUniformLocation(idProgram, "bUseTexture"), 1);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, idTextureBuffer); // Tekstura z FBO
+        glUniform1i(glGetUniformLocation(idProgram, "uTextureSampler"), 0);
+        glUniform1i(glGetUniformLocation(idProgram, "bUseTexture"), 1);
 
-    glBindVertexArray(idVAO[SCREEN]);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-    glBindVertexArray(0);
+        glBindVertexArray(idVAO[SCREEN]);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        glBindVertexArray(0);
 
-    glEnable(GL_DEPTH_TEST);
+        glEnable(GL_DEPTH_TEST);
+    }
 }
 
 void Initialize() {
@@ -374,7 +377,8 @@ void playerAnimation() {
         bool isMoving = keys[GLFW_KEY_W] || keys[GLFW_KEY_S];
         float walkAngle = isMoving ? sin(t * 8.0f) * 0.6f : 0.0f;
 
-        glm::vec3 p = myPlayer.position;
+        glm::vec3 offset = glm::vec3(0.0f, 0.625f, 0.0f); 
+        glm::vec3 p = myPlayer.position + offset;
         float rotY = myPlayer.rotationY;
 
         // Wszystkie części mają tę samą pozycję, bo mają wspólny pivot
@@ -440,7 +444,9 @@ void DisplayScene() {
     //glm::mat4 matView = glm::lookAt(cameraPos, myPlayer.position + glm::vec3(0, 1.5f, 0), glm::vec3(0, 1, 0));
 
     // 2. Render pozaekranowy (zawsze pierwszy!)
-    RenderScene_to_Texture();
+    if (showMinimap) {
+        RenderScene_to_Texture();
+    }
 
     // 3. Render właściwy
     RenderScene_on_Screen(matProj, matView, cameraPos);
@@ -526,9 +532,9 @@ void my_key_callback(GLFWwindow* window, int key, int scancode, int action, int 
         if (key == GLFW_KEY_P) { useBlinnPhong = false; printf("Model: Phong\n"); }
         if (key == GLFW_KEY_B) { useBlinnPhong = true; printf("Model: Blinn-Phong\n"); }
         //Klawisz animacji
-        if (key == GLFW_KEY_M && action == GLFW_PRESS) {
+        if (key == GLFW_KEY_L && action == GLFW_PRESS) {
             animateLight = !animateLight;
-            printf("Animacja swiatla: %s\n", animateLight ? "ON" : "OFF");
+            printf("Animacja swiatla (L): %s\n", animateLight ? "ON" : "OFF");
         }
         if (key == GLFW_KEY_G && action == GLFW_PRESS) {
             showLightSource = !showLightSource;
@@ -543,6 +549,11 @@ void my_key_callback(GLFWwindow* window, int key, int scancode, int action, int 
             activeLightsCount++;
             if (activeLightsCount > 4) activeLightsCount = 1;
             printf("Liczba aktywnych swiatel: %d\n", activeLightsCount);
+        }
+
+        if (key == GLFW_KEY_M && action == GLFW_PRESS) {
+            showMinimap = !showMinimap;
+            printf("Minimapa: %s\n", showMinimap ? "Wlaczyła" : "Wylaczona");
         }
         
         // Kolory światła
