@@ -19,6 +19,9 @@ GLuint DepthMap_idProgram;
 GLuint DepthMap_idFrameBuffer;
 GLuint DepthMap_idTexture;
 
+glm::mat4 lightProj;
+glm::mat4 lightView;
+
 // Rozdzielczosc depth mapy
 const unsigned int DepthMap_Width = 1024;
 const unsigned int DepthMap_Height = 1024;
@@ -32,8 +35,6 @@ glm::vec3 lightPosition;
 
 // Macierze rzutowania dla kamery patrzacej z punktu
 // widzenia oswietlenia
-glm::mat4 lightProj;
-glm::mat4 lightView;
 
 // -------------------------------------------------------
 void ShadowMapDir_Init()

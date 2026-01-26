@@ -29,6 +29,7 @@ glm::vec3 lightColor = glm::vec3(1.0f, 1.0f, 1.0f); // Domyślnie białe
 #include "skybox.h"
 #include "ground.hpp"
 #include "player.hpp"
+#include "shadow-dir.hpp"
 
 CGround myGround;
 CPlayer myPlayer;
@@ -46,6 +47,7 @@ Skybox* skybox2 = nullptr;
 int currentSkybox = 0;
 const int FLOWER_COUNT = 20;
 bool showMinimap = true; // Flaga widoczności minimapy
+bool useShadows = true; // Flaga kontrolna
 
 // --- STRUKTURA ŚWIATŁA ---
 struct PointLight {
@@ -56,6 +58,7 @@ struct PointLight {
 
 PointLight lights[4];
 int activeLightsCount = 1; // Startujemy z jednym światłem
+//glm::mat4 lightProj, lightView; //macierze swiatla do shaddow mappingu
 
 
 // Zmienne
@@ -118,6 +121,8 @@ void setupFBO() {
 void DrawWorld(glm::mat4 projection, glm::mat4 view, glm::vec3 camPos) {
    
     glm::mat4 viewStatic = glm::mat4(glm::mat3(view)); // Usuwamy translację
+
+    //glUseProgram(idProgram);
 
     glActiveTexture(GL_TEXTURE1);
     if (currentSkybox == 0) glBindTexture(GL_TEXTURE_CUBE_MAP, skybox1->getTextureID());
@@ -183,6 +188,15 @@ void DrawWorld(glm::mat4 projection, glm::mat4 view, glm::vec3 camPos) {
     
     glUniform1i(glGetUniformLocation(idProgram, "bIsInstanced"), 0);
 
+    // shaddow mapping
+    glUniformMatrix4fv(glGetUniformLocation(idProgram, "lightProj"), 1, GL_FALSE, glm::value_ptr(lightProj));
+    glUniformMatrix4fv(glGetUniformLocation(idProgram, "lightView"), 1, GL_FALSE, glm::value_ptr(lightView));
+
+    // Przekazujemy teksturę cienia na SLOT 2 (Slot 0 - tekstura obiektu, Slot 1 - Skybox)
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, DepthMap_idTexture);
+    glUniform1i(glGetUniformLocation(idProgram, "tex_shadowMap"), 2);
+
     // --- OBIEKTY SCENY ---
     for (const auto& obj : scene) {
         glm::mat4 matModel = glm::mat4(1.0);
@@ -238,6 +252,33 @@ void DrawWorld(glm::mat4 projection, glm::mat4 view, glm::vec3 camPos) {
         }
         glUniform1i(glGetUniformLocation(idProgram, "bIsLightSource"), false);
     }
+}
+
+void DrawWorldForShadows() {
+    glUseProgram(DepthMap_idProgram);
+
+    // Przesyłamy wspólne macierze światła (już ustawione w DisplayScene, ale dla pewności)
+    glUniformMatrix4fv(glGetUniformLocation(DepthMap_idProgram, "matProj"), 1, GL_FALSE, glm::value_ptr(lightProj));
+    glUniformMatrix4fv(glGetUniformLocation(DepthMap_idProgram, "matView"), 1, GL_FALSE, glm::value_ptr(lightView));
+
+    // kwiaty 
+
+    // 2. Rysujemy obiekty sceny
+    for (const auto& obj : scene) {
+        // Żarówki nie rzucają cienia
+        if (obj.mesh == &meshes[2]) continue; 
+
+        glm::mat4 matModel = glm::mat4(1.0);
+        matModel = glm::translate(matModel, obj.position);
+        matModel = glm::rotate(matModel, obj.rotation.y, glm::vec3(0, 1, 0));  
+        matModel = glm::rotate(matModel, obj.rotation.x, glm::vec3(1, 0, 0)); 
+        matModel = glm::rotate(matModel, obj.rotation.z, glm::vec3(0, 0, 1)); 
+        matModel = glm::scale(matModel, obj.scale);
+        
+        glUniformMatrix4fv(glGetUniformLocation(DepthMap_idProgram, "matModel"), 1, GL_FALSE, glm::value_ptr(matModel));
+
+        obj.mesh->Draw();
+    }   
 }
 
 void RenderScene_to_Texture() {
@@ -377,7 +418,7 @@ void playerAnimation() {
         bool isMoving = keys[GLFW_KEY_W] || keys[GLFW_KEY_S];
         float walkAngle = isMoving ? sin(t * 8.0f) * 0.6f : 0.0f;
 
-        glm::vec3 offset = glm::vec3(0.0f, 0.5f, 0.0f); 
+        glm::vec3 offset = glm::vec3(0.0f, 0.4f, 0.0f); 
         glm::vec3 p = myPlayer.position + offset;
         float rotY = myPlayer.rotationY;
 
@@ -443,7 +484,25 @@ void DisplayScene() {
     //glm::vec3 cameraPos = myPlayer.position + cameraOffset;
     //glm::mat4 matView = glm::lookAt(cameraPos, myPlayer.position + glm::vec3(0, 1.5f, 0), glm::vec3(0, 1, 0));
 
-    // 2. Render pozaekranowy (zawsze pierwszy!)
+    // 1. Generowanie Mapy Cieni (Tylko głębia)
+    if (useShadows) {
+        glViewport(0, 0, DepthMap_Width, DepthMap_Height);
+        glBindFramebuffer(GL_FRAMEBUFFER, DepthMap_idFrameBuffer);
+        glClear(GL_DEPTH_BUFFER_BIT);
+        
+        glUseProgram(DepthMap_idProgram);
+        
+        // Przesyłamy macierze światła
+        glUniformMatrix4fv(glGetUniformLocation(DepthMap_idProgram, "matProj"), 1, GL_FALSE, glm::value_ptr(lightProj));
+        glUniformMatrix4fv(glGetUniformLocation(DepthMap_idProgram, "matView"), 1, GL_FALSE, glm::value_ptr(lightView));
+
+        // Rysujemy świat (musisz tu wywołać DrawWorld lub pętlę rysującą obiekty)
+        DrawWorldForShadows(); 
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
+
+    // 2. Render pozaekranowy
     if (showMinimap) {
         RenderScene_to_Texture();
     }
@@ -600,6 +659,7 @@ int main() {
     Initialize();
     SetupLights();
     setupFBO();
+    ShadowMapDir_Init();
 
     while (!glfwWindowShouldClose(window)) {
         DisplayScene();
