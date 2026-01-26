@@ -44,7 +44,7 @@ void ShadowMapDir_Init()
 	lightPosition = glm::vec3(0.0f, 5.0f, -25.0f);
 
 	// Ustawienie macierzy kamery swiatla
-	lightProj = glm::ortho(-20.0f, 20.0f, -20.0f, 20.0f, 2.0f, 30.5f);
+	lightProj = glm::ortho(-50.0f, 50.0f, -50.0f, 50.0f, 0.1f, 200.0f); //ustawiamy miejsce w ktorym odcina obliczanie cieni
 	lightView = glm::lookAt(lightPosition, lightPosition + lightDirection, glm::vec3(0.0f, 1.0f, 0.0f));
 
 

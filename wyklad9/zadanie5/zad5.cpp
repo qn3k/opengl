@@ -418,7 +418,7 @@ void playerAnimation() {
         bool isMoving = keys[GLFW_KEY_W] || keys[GLFW_KEY_S];
         float walkAngle = isMoving ? sin(t * 8.0f) * 0.6f : 0.0f;
 
-        glm::vec3 offset = glm::vec3(0.0f, 0.4f, 0.0f); 
+        glm::vec3 offset = glm::vec3(0.0f, 0.3f, 0.0f); 
         glm::vec3 p = myPlayer.position + offset;
         float rotY = myPlayer.rotationY;
 
@@ -478,6 +478,7 @@ void DisplayScene() {
     glm::vec3 lookAtPoint = myPlayer.position + glm::vec3(0.0f, 1.0f, 0.0f);
 
     glm::mat4 matView = glm::lookAt(cameraPos, lookAtPoint, glm::vec3(0.0f, 1.0f, 0.0f));
+
     //glUniformMatrix4fv(glGetUniformLocation(idProgram, "matView"), 1, GL_FALSE, glm::value_ptr(matView));
 
     //glm::vec3 cameraOffset = glm::vec3(-5.0f * sin(myPlayer.rotationY), 3.0f, -5.0f * cos(myPlayer.rotationY));
@@ -492,12 +493,18 @@ void DisplayScene() {
         
         glUseProgram(DepthMap_idProgram);
         
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_FRONT);
+
         // Przesyłamy macierze światła
         glUniformMatrix4fv(glGetUniformLocation(DepthMap_idProgram, "matProj"), 1, GL_FALSE, glm::value_ptr(lightProj));
         glUniformMatrix4fv(glGetUniformLocation(DepthMap_idProgram, "matView"), 1, GL_FALSE, glm::value_ptr(lightView));
 
         // Rysujemy świat (musisz tu wywołać DrawWorld lub pętlę rysującą obiekty)
         DrawWorldForShadows(); 
+
+        glCullFace(GL_BACK); 
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
