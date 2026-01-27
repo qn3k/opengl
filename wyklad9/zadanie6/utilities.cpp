@@ -16,6 +16,17 @@ double __mouse_buttonX, __mouse_buttonY;
 bool Mouse_Press = false;
 int  Mouse_Button = 0;
 
+//externy
+extern bool useLighting;
+extern bool showMinimap;
+extern bool keys[1024];
+extern bool useBlinnPhong;
+extern bool animateLight;
+extern bool showLightSource;
+extern bool isPointLight;
+extern int activeLightsCount;
+extern glm::vec3 lightColor;
+
 // --------------------------------------------------------------
 // Funkcja zwraca macierz widoku dla kamery
 // --------------------------------------------------------------
@@ -141,6 +152,7 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 // funkcja zwrotna do obslugi klawiatury
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
+    // 1. Obsługa wyjścia i logowanie (Twoja stara logika)
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, GLFW_TRUE);
 
@@ -149,6 +161,44 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         printf("Nacisnieto klawisz %d \n", key);
     }
 
+    // 2. Obsługa tablicy keys (do płynnego ruchu w handleInput)
+    if (key >= 0 && key < 1024) {
+        if (action == GLFW_PRESS)
+            keys[key] = true;
+        else if (action == GLFW_RELEASE)
+            keys[key] = false;
+    }
+
+    // 3. Logika przełączników (tylko przy naciśnięciu - GLFW_PRESS)
+    if (action == GLFW_PRESS) {
+        
+        // Renderowanie / Oświetlenie
+        if (key == GLFW_KEY_F1) { useLighting = false; printf("Oswietlenie: OFF\n"); }
+        if (key == GLFW_KEY_F2) { useLighting = true;  printf("Oswietlenie: ON\n"); }
+        if (key == GLFW_KEY_P)  { useBlinnPhong = false; printf("Model: Phong\n"); }
+        if (key == GLFW_KEY_B)  { useBlinnPhong = true;  printf("Model: Blinn-Phong\n"); }
+        
+        // Minimapa
+        if (key == GLFW_KEY_M) {
+            showMinimap = !showMinimap;
+            printf("Minimapa: %s\n", showMinimap ? "ON" : "OFF");
+        }
+
+        // Parametry świateł
+        if (key == GLFW_KEY_L) { animateLight = !animateLight; }
+        if (key == GLFW_KEY_G) { showLightSource = !showLightSource; }
+        if (key == GLFW_KEY_H) { isPointLight = !isPointLight; }
+        if (key == GLFW_KEY_N) {
+            activeLightsCount = (activeLightsCount % 4) + 1;
+            printf("Aktywne swiatla: %d\n", activeLightsCount);
+        }
+
+        // Kolory (1-4)
+        if (key == GLFW_KEY_1) lightColor = glm::vec3(1.0, 1.0, 1.0);
+        if (key == GLFW_KEY_2) lightColor = glm::vec3(1.0, 0.0, 0.0);
+        if (key == GLFW_KEY_3) lightColor = glm::vec3(0.0, 1.0, 0.0);
+        if (key == GLFW_KEY_4) lightColor = glm::vec3(0.0, 0.0, 1.0);
+    }
 }
 
 

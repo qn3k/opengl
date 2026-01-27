@@ -13,8 +13,8 @@
 #include <glm/gtc/type_ptr.hpp>
 
 // Musimy zadeklarować matProj tutaj, bo utilities.hpp go używa
-int windowWidth = 1600;
-int windowHeight = 900;
+int windowWidth = 800;
+int windowHeight = 600;
 const char* windowTitle = "Projekt beta v0.1";
 glm::mat4 matProj;
 glm::vec3 lightColor = glm::vec3(1.0f, 1.0f, 1.0f); // Domyślnie białe
@@ -30,6 +30,7 @@ glm::vec3 lightColor = glm::vec3(1.0f, 1.0f, 1.0f); // Domyślnie białe
 #include "ground.hpp"
 #include "player.hpp"
 #include "shadow-dir.hpp"
+#include "PlayerLogic.hpp"
 
 CGround myGround;
 CPlayer myPlayer;
@@ -47,6 +48,10 @@ Skybox* skybox2 = nullptr;
 int currentSkybox = 0;
 bool showMinimap = true; // Flaga widoczności minimapy
 bool useShadows = true; // Flaga kontrolna
+bool canMove = true;
+bool playerArrow = true;
+float playerRadius = 0.5f;
+extern std::vector<glm::mat4> treeMatrices;
 
 // --- STRUKTURA ŚWIATŁA ---
 struct PointLight {
@@ -85,6 +90,14 @@ GLfloat vertices_pos[] = {
      1.0f,  1.0f, 0.0f,
     -1.0f,  1.0f, 0.0f,
     -1.0f, -1.0f, 0.0f,
+};
+
+//strzalka
+GLuint arrowVAO;
+GLfloat arrowVertices[] = {
+    0.0f,  0.0f,  0.5f, // Czubek
+    -0.3f,  0.0f, -0.5f, // Lewy tył
+    0.3f,  0.0f, -0.5f  // Prawy tył
 };
 
 void setupFBO() {
@@ -295,16 +308,22 @@ void DrawWorldForShadows() {
 
 void RenderScene_to_Texture() {
     glBindFramebuffer(GL_FRAMEBUFFER, fbo); 
-    glViewport(0, 0, bufferWidth, bufferHeight);
+    glViewport(0, 0, 800, 600); // Zgodnie z rozmiarem tekstury w setupFBO
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    glm::mat4 miniProj = glm::ortho(-20.0f, 20.0f, -20.0f, 20.0f, 0.1f, 100.0f);
-    glm::mat4 miniView = glm::lookAt(myPlayer.position + glm::vec3(0, 50, 0), 
-                                     myPlayer.position, 
-                                     glm::vec3(0, 0, -1));
+    float zoom = 20.0f; 
+    glm::mat4 miniProj = glm::ortho(-zoom, zoom, -zoom, zoom, 0.1f, 100.0f);
+    /*
+    glm::mat4 miniView = glm::lookAt(
+        myPlayer.position + glm::vec3(0, 50, 0), 
+        myPlayer.position, 
+        glm::vec3(0, 0, -1) 
+    );
+    */
+    glm::mat4 miniView = glm::lookAt(glm::vec3(0, 50, 0), glm::vec3(0, 0, 0), glm::vec3(0, 0, -1));
 
-    // Teraz kompilator widzi DrawWorld, bo jest wyżej w pliku
+    // 1. Rysujemy świat na minimapie
     DrawWorld(miniProj, miniView, myPlayer.position + glm::vec3(0, 50, 0));
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -358,7 +377,7 @@ void Initialize() {
 
     glClearColor(0.1f, 0.1f, 0.1f, 1.0f); 
     glEnable(GL_DEPTH_TEST);
-    
+
     // Włączenie blendowania dla przezroczystości tekstur kwiatów
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -389,7 +408,7 @@ void Initialize() {
     skybox1 = new Skybox(faces1, "shaders/skybox-vertex.glsl", "shaders/skybox-fragment.glsl");
     skybox2 = new Skybox(faces2, "shaders/skybox-vertex.glsl", "shaders/skybox-fragment.glsl");
     
-    matProj = glm::perspective(glm::radians(80.0f), windowWidth/(float)windowHeight, 0.1f, 250.0f);
+    matProj = glm::perspective(glm::radians(80.0f), windowWidth/(float)windowHeight, 0.1f, 500.0f);
 
     // Inicjalizacja kwadratu dla minimapy (SCREEN)
     glGenVertexArrays(1, &idVAO[SCREEN]);
@@ -412,42 +431,6 @@ void Initialize() {
     glBindVertexArray(0);
 }
 
-//sterowanie postacia
-void handleInput() {
-    float speed = 0.05f;
-    float rotSpeed = 0.03f;
-    if (keys[GLFW_KEY_W]) myPlayer.Move(speed);
-    if (keys[GLFW_KEY_S]) myPlayer.Move(-speed);
-    if (keys[GLFW_KEY_A]) myPlayer.Rotate(rotSpeed);
-    if (keys[GLFW_KEY_D]) myPlayer.Rotate(-rotSpeed);
-}
-
-void playerAnimation() {
-    // --- ANIMACJA LUDZIKA ---
-    // Sprawdź czy indeksy zostały znalezione, żeby nie wywalić programu
-    if (pIdx.body != -1 && pIdx.legR != -1 && pIdx.legL != -1) {
-        float t = glfwGetTime();
-        bool isMoving = keys[GLFW_KEY_W] || keys[GLFW_KEY_S];
-        float walkAngle = isMoving ? sin(t * 8.0f) * 0.6f : 0.0f;
-
-        glm::vec3 offset = glm::vec3(0.0f, 0.3f, 0.0f); 
-        glm::vec3 p = myPlayer.position + offset;
-        float rotY = myPlayer.rotationY;
-
-        // Wszystkie części mają tę samą pozycję, bo mają wspólny pivot
-        scene[pIdx.body].position = p;
-        scene[pIdx.legR].position = p;
-        scene[pIdx.legL].position = p;
-
-        // Tors obraca się tylko wokół osi Y
-        scene[pIdx.body].rotation = glm::vec3(0.0f, rotY, 0.0f);
-
-        // Nogi: Muszą machać przód-tył (oś X) ORAZ obracać się tam gdzie gracz (oś Y)
-        scene[pIdx.legR].rotation = glm::vec3(0.0f, rotY, walkAngle); 
-        scene[pIdx.legL].rotation = glm::vec3(0.0f, rotY, -walkAngle);
-    }
-}
-
 //swiatla kolorowe
 void SetupLights() {
     // Światło 1: Białe (krążące - to co już masz)
@@ -462,8 +445,8 @@ void SetupLights() {
 
 void DisplayScene() {
 
-    handleInput();
-    playerAnimation();
+    handleInput(keys, myPlayer, scene, meshes, pIdx, playerIdx, playerRadius, treeMatrices);
+    playerAnimation(keys, myPlayer, scene, pIdx);
 
     //obsluga kamery wokol srodka
     //glm::mat4 matView = UpdateViewMatrix(); 
@@ -561,7 +544,7 @@ void DisplayScene() {
         for (int i = 0; i < activeLightsCount; i++) {
             ImGui::PushID(i);
             char buf[32];
-            sprintf(buf, "Light %d", i + 1);
+            snprintf(buf, sizeof(buf), "Light %d", i + 1);
             if (ImGui::TreeNode(buf)) {
                 ImGui::ColorEdit3("Color", glm::value_ptr(lights[i].color));
                 ImGui::SliderFloat("Intensity", &lights[i].intensity, 0.0f, 5.0f);
@@ -583,63 +566,7 @@ void DisplayScene() {
 
 // Nadpisujemy key_callback
 void my_key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-    if (key >= 0 && key < 1024) {
-        if (action == GLFW_PRESS)
-            keys[key] = true;
-        else if (action == GLFW_RELEASE)
-            keys[key] = false;
-    }
-
     key_callback(window, key, scancode, action, mods);
-
-    if (action == GLFW_PRESS) {
-        
-        // F1: Renderowanie BEZ oświetlenia (czysty kolor/tekstura)
-        if (key == GLFW_KEY_F1) {
-            useLighting = false;
-            printf("Tryb renderingu: BEZ OSWIETLENIA (Unlit)\n");
-        }
-
-        // F2: Renderowanie Z oświetleniem (Phong / Blinn-Phong)
-        if (key == GLFW_KEY_F2) {
-            useLighting = true;
-            printf("Tryb renderingu: Z OSWIETLENIEM (Lit)\n");
-        }
-
-        // Pozostałe klawisze 
-        if (key == GLFW_KEY_P) { useBlinnPhong = false; printf("Model: Phong\n"); }
-        if (key == GLFW_KEY_B) { useBlinnPhong = true; printf("Model: Blinn-Phong\n"); }
-        //Klawisz animacji
-        if (key == GLFW_KEY_L && action == GLFW_PRESS) {
-            animateLight = !animateLight;
-            printf("Animacja swiatla (L): %s\n", animateLight ? "ON" : "OFF");
-        }
-        if (key == GLFW_KEY_G && action == GLFW_PRESS) {
-            showLightSource = !showLightSource;
-            printf("Widocznosc zrodla swiatla (G): %s\n", showLightSource ? "ON" : "OFF");
-        }
-        if (key == GLFW_KEY_H && action == GLFW_PRESS) {
-            isPointLight = !isPointLight;
-            printf("Typ oswietlenia (H): %s\n", isPointLight ? "PUNKTOWE" : "KIERUNKOWE");
-        }
-
-        if (key == GLFW_KEY_N && action == GLFW_PRESS) {
-            activeLightsCount++;
-            if (activeLightsCount > 4) activeLightsCount = 1;
-            printf("Liczba aktywnych swiatel: %d\n", activeLightsCount);
-        }
-
-        if (key == GLFW_KEY_M && action == GLFW_PRESS) {
-            showMinimap = !showMinimap;
-            printf("Minimapa: %s\n", showMinimap ? "Wlaczyła" : "Wylaczona");
-        }
-        
-        // Kolory światła
-        if (key == GLFW_KEY_1) { lightColor = glm::vec3(1.0, 1.0, 1.0); } // White
-        if (key == GLFW_KEY_2) { lightColor = glm::vec3(1.0, 0.0, 0.0); } // Red
-        if (key == GLFW_KEY_3) { lightColor = glm::vec3(0.0, 1.0, 0.0); } // Green
-        if (key == GLFW_KEY_4) { lightColor = glm::vec3(0.0, 0.0, 1.0); } // Blue
-    }
 }
 
 int main() {

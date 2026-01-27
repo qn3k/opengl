@@ -243,6 +243,7 @@ void InitializeResources(std::vector<CMesh>& meshes, std::vector<GLuint>& textur
 
     //kwiaty
     flowerMatrices.clear();
+    flowerColors.clear();
     for(int i = 0; i < FLOWER_COUNT; i++) {
         float x, z, y;
         bool found = false;
@@ -277,37 +278,61 @@ void InitializeResources(std::vector<CMesh>& meshes, std::vector<GLuint>& textur
 
     //drzewa
     treeMatrices.clear();
+    treeColors.clear();
+    float minDist = 1.5f;
     for(int i = 0; i < TREE_COUNT; i++) {
-        float x, z, y;
-        bool found = false;
-        
-        // Próbuj znaleźć miejsce na podłodze (max 10 prób)
-        for(int tries = 0; tries < 10; tries++) {
-            x = (rand() % 2000 - 1000) / 10.0f; 
-            z = (rand() % 2000 - 1000) / 10.0f;
-            y = GetHeight(x, z);
+    float x, z, y;
+    bool foundPlace = false;
+    
+    // Próbuj znaleźć miejsce 
+    for(int tries = 0; tries < 20; tries++) {
+        x = (rand() % 2000 - 1000) / 10.0f; 
+        z = (rand() % 2000 - 1000) / 10.0f;
+        y = GetHeight(x, z);
 
-            if (y > -900000.0f) { //jesli jest podloga
-                found = true;
+        if (y > -900000.0f) { 
+            // 1. BLOKADA PUNKTU STARTOWEGO
+            glm::vec3 forbiddenPoint = glm::vec3(0.0f, 0.0f, 0.0f);
+            float safeRadius = 3.0f; // Obszar wolny od drzew wokół punktu
+            
+            float distToForbidden = glm::distance(glm::vec2(x, z), glm::vec2(forbiddenPoint.x, forbiddenPoint.z));
+            
+            if (distToForbidden < safeRadius) {
+                continue; // Losuj nową pozycję, to miejsce jest zakazane
+            }
+
+            // 2. SPRAWDZANIE DYSTANSU DO INNYCH DRZEW 
+            bool tooClose = false;
+            for(const auto& existingMat : treeMatrices) {
+                glm::vec3 existingPos = glm::vec3(existingMat[3]);
+                if(glm::distance(glm::vec2(x, z), glm::vec2(existingPos.x, existingPos.z)) < minDist) {
+                    tooClose = true;
+                    break;
+                }
+            }
+
+            if (!tooClose) {
+                foundPlace = true;
                 break;
             }
         }
+    }
 
-        if (found) {
-            float a = glm::radians((float)(rand() % 360));
-            float s = 0.3f + (rand() / (float)RAND_MAX) * 0.4f;
+    if (foundPlace) {
+        float a = glm::radians((float)(rand() % 360));
+        float s = 0.3f + (rand() / (float)RAND_MAX) * 0.4f;
 
-            float r = 0.5f + (rand() % 50) / 100.0f;
-            float g = 0.5f + (rand() % 50) / 100.0f;
-            float b = 0.2f; 
-            treeColors.push_back(glm::vec3(r, g, b));
+        float r = 0.5f + (rand() % 50) / 100.0f;
+        float g = 0.5f + (rand() % 50) / 100.0f;
+        float b = 0.2f; 
+        treeColors.push_back(glm::vec3(r, g, b));
 
-            glm::mat4 m = glm::mat4(1.0f);
-            m = glm::translate(m, glm::vec3(x, y, z));
-            m = glm::rotate(m, a, glm::vec3(0.0f, 1.0f, 0.0f));
-            m = glm::scale(m, glm::vec3(s, s, s));
-            treeMatrices.push_back(m);
-        }
+        glm::mat4 m = glm::mat4(1.0f);
+        m = glm::translate(m, glm::vec3(x, y, z));
+        m = glm::rotate(m, a, glm::vec3(0.0f, 1.0f, 0.0f));
+        m = glm::scale(m, glm::vec3(s, s, s));
+        treeMatrices.push_back(m);
+    }
     }
 
     // Przygotuj siatkę drzewa (meshes[11]) do instancjonowania
@@ -350,7 +375,7 @@ void BuildScene(std::vector<SceneObject>& scene, std::vector<CMesh>& meshes, std
     // --- OBIEKT 2: Sześcian ---
     SceneObject box;
     box.mesh = &meshes[1];
-    box.position = glm::vec3(-2.0f, 0.0f, -2.0f);
+    box.position = glm::vec3(3.0f, 0.0f, -2.0f);
     box.rotation = glm::vec3(0.0f);
     box.scale = glm::vec3(1.0f);
     box.color = glm::vec3(1.0f); 
@@ -362,7 +387,7 @@ void BuildScene(std::vector<SceneObject>& scene, std::vector<CMesh>& meshes, std
     // --- SFERA 1: BŁYSZCZĄCA (Shiny) ---
     SceneObject shinyBall;
     shinyBall.mesh = &meshes[2]; // Sfera
-    shinyBall.position = glm::vec3(-2.5f, 1.0f, 0.0f);
+    shinyBall.position = glm::vec3(-5.0f, 1.0f, 0.0f);
     shinyBall.scale = glm::vec3(1.0f);
     shinyBall.color = glm::vec3(0.0f, 0.4f, 1.0f); // Niebieska
     shinyBall.idTexture = 0; // Bez tekstury, żeby lepiej widzieć blask
@@ -374,7 +399,7 @@ void BuildScene(std::vector<SceneObject>& scene, std::vector<CMesh>& meshes, std
     // Reaguje tylko na diffuse, nie ma "plamy" światła odbitego
     SceneObject matteBall;
     matteBall.mesh = &meshes[2]; // Ta sama siatka sfery
-    matteBall.position = glm::vec3(2.5f, 1.0f, 0.0f);
+    matteBall.position = glm::vec3(5.0f, 1.0f, 0.0f);
     matteBall.scale = glm::vec3(1.0f);
     matteBall.color = glm::vec3(1.0f, 0.3f, 0.0f); // Pomarańczowa
     matteBall.idTexture = 0;
@@ -385,7 +410,7 @@ void BuildScene(std::vector<SceneObject>& scene, std::vector<CMesh>& meshes, std
     // --- OBIEKT 4: Małpka ---
     SceneObject suzanne;
     suzanne.mesh = &meshes[3]; 
-    suzanne.position = glm::vec3(0.0f, 0.5f, 1.0f);
+    suzanne.position = glm::vec3(0.0f, 0.5f, 3.0f);
     suzanne.rotation = glm::vec3(0.0f, 3.14f, 0.0f); 
     suzanne.scale = glm::vec3(1.0f);
     suzanne.color = glm::vec3(1.0f, 0.8f, 0.1f); 
@@ -412,7 +437,7 @@ void BuildScene(std::vector<SceneObject>& scene, std::vector<CMesh>& meshes, std
     // --- OBIEKT 6: KOLIBER ---
     SceneObject koliber;
     koliber.mesh = &meshes[5]; 
-    koliber.position = glm::vec3(0.0f, 5.0f, 0.0f); // Wyżej nad ziemią
+    koliber.position = glm::vec3(0.0f, 5.0f, -5.0f); // Wyżej nad ziemią
     koliber.rotation = glm::vec3(0.0f, 1.57f, 0.0f);
     koliber.scale = glm::vec3(2.0f); 
     koliber.color = glm::vec3(0.1f, 0.5f, 0.4f); 

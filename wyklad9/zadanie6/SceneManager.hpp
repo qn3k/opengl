@@ -8,6 +8,8 @@
 
 // --- STRUKTURY DANYCH ---
 
+extern std::vector<glm::mat4> treeMatrices;
+
 struct Material {
     float ambient;
     float diffuse;

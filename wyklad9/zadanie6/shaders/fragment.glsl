@@ -128,7 +128,7 @@ void main()
         finalAlpha = texColor.a;
 
         // Discard tylko dla obiektów z przezroczystością tekstury
-        if(finalAlpha < 0.2) discard; 
+        if(finalAlpha < 0.1) discard; 
     } 
     else {
         // Obiekty bez tekstury (np. Drzewa / Sześciany)
