@@ -1,0 +1,68 @@
+// ----------------------------------------
+// Obsluga klasy CCamera
+// ----------------------------------------
+
+// Przyklad uzycia dla kamery swobodnej
+// Kolejne kroki:
+
+
+// 1. Dodanie pliku naglowkowego oraz stworzenie obiektu
+// klasy CFreeCamera (pochodna klasy CCamera)
+
+#include "camera.hpp"
+CFreeCamera myCamera;
+
+// 2. Inicjalizacja w Initialize()
+// obecnie domyslne ustawienia obiektu sa ustawiane 
+// w domyslnym konstruktorze klasy CCamera, ale dobrym
+// pomyslem jest uzupelnienie metody Init() w klasie 
+// CFreeCamera wg potrzeby, obecnie niepotrzebne
+
+myCamera.Init(windowWidth, windowHeight);
+
+
+// 3. W funkcji zwrotnej obslugujacej zmiane rozdzielczosci
+// Reshape() / framebuffer_size_callback()
+// nalezy zaktualizowac macierz rzutowania 
+// metoda UpdatePerspective()
+
+myCamera.UpdatePerspective(screen_width, screen_height);
+
+// 4. W DisplayScene() przesylamy aktualne macierze kamery
+// matProj oraz matView do potoku
+
+myCamera.SetUniformPV(idProgram, "matProj", "matView");
+
+// 5. Skorzystanie z metody CFreeCamera::Rotate() do zmiany
+// orientacji kamery w funkcji cursor_position_callback()
+
+void cursor_position_callback(GLFWwindow* window, double xpos, double ypos)
+{
+	if (__mouse_press && __mouse_button == GLFW_MOUSE_BUTTON_LEFT)
+	{
+		float dx = 2.0*(xpos - __mouse_buttonX)/(float)windowHeight;
+		float dy = 2.0*(ypos - __mouse_buttonY)/(float)windowWidth;
+		__mouse_buttonX = xpos;
+		__mouse_buttonY = ypos;
+
+		myCamera.Rotate(dx, dy);
+	}
+}
+
+
+// 6. Skorzystanie z metody CFreeCamera::Move() do zmiany
+// polozenia kamery w funkcji keyboard_handler()
+
+...
+
+	float speed  = 0.1f;
+	
+	if (__keys[GLFW_KEY_UP])
+		myCamera.Move(speed);
+
+	if (__keys[GLFW_KEY_DOWN])
+		myCamera.Move(-speed);
+...
+
+
+

@@ -92,14 +92,6 @@ GLfloat vertices_pos[] = {
     -1.0f, -1.0f, 0.0f,
 };
 
-//strzalka
-GLuint arrowVAO;
-GLfloat arrowVertices[] = {
-    0.0f,  0.0f,  0.5f, // Czubek
-    -0.3f,  0.0f, -0.5f, // Lewy tył
-    0.3f,  0.0f, -0.5f  // Prawy tył
-};
-
 void setupFBO() {
     // 1. Tworzymy Framebuffer
     glGenFramebuffers(1, &fbo);
@@ -272,6 +264,8 @@ void DrawWorld(glm::mat4 projection, glm::mat4 view, glm::vec3 camPos) {
         }
         glUniform1i(glGetUniformLocation(idProgram, "bIsLightSource"), false);
     }
+
+    //strzalka
 }
 
 void DrawWorldForShadows() {
@@ -308,20 +302,17 @@ void DrawWorldForShadows() {
 
 void RenderScene_to_Texture() {
     glBindFramebuffer(GL_FRAMEBUFFER, fbo); 
-    glViewport(0, 0, 800, 600); // Zgodnie z rozmiarem tekstury w setupFBO
+    glViewport(0, 0, 800, 600); 
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    float zoom = 20.0f; 
+    float zoom = 25.0f; 
     glm::mat4 miniProj = glm::ortho(-zoom, zoom, -zoom, zoom, 0.1f, 100.0f);
-    /*
     glm::mat4 miniView = glm::lookAt(
         myPlayer.position + glm::vec3(0, 50, 0), 
         myPlayer.position, 
         glm::vec3(0, 0, -1) 
     );
-    */
-    glm::mat4 miniView = glm::lookAt(glm::vec3(0, 50, 0), glm::vec3(0, 0, 0), glm::vec3(0, 0, -1));
 
     // 1. Rysujemy świat na minimapie
     DrawWorld(miniProj, miniView, myPlayer.position + glm::vec3(0, 50, 0));
@@ -445,7 +436,7 @@ void SetupLights() {
 
 void DisplayScene() {
 
-    handleInput(keys, myPlayer, scene, meshes, pIdx, playerIdx, playerRadius, treeMatrices);
+    handleInput(keys, myPlayer, scene, meshes, pIdx, playerIdx, playerRadius);
     playerAnimation(keys, myPlayer, scene, pIdx);
 
     //obsluga kamery wokol srodka
@@ -499,8 +490,6 @@ void DisplayScene() {
         DrawWorldForShadows(); 
 
         glCullFace(GL_BACK); 
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
@@ -619,6 +608,12 @@ int main() {
     for(auto& m : meshes) m.Release();
     delete skybox1;
     delete skybox2;
+    for (auto& obj : scene) {
+    if (obj.collider != nullptr) {
+        delete obj.collider;
+        obj.collider = nullptr;
+    }
+    }
     glfwTerminate();
     return 0;
 }

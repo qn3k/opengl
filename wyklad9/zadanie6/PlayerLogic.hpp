@@ -7,6 +7,7 @@
 #include <vector>
 #include "player.hpp"
 #include "SceneManager.hpp" 
+#include "collider.hpp"
 
 void handleInput(
     bool* keys, 
@@ -15,8 +16,7 @@ void handleInput(
     const std::vector<CMesh>& meshes,
     const PlayerIndices& pIdx,
     int playerIdx,
-    float playerRadius,
-    const std::vector<glm::mat4>& treeMatrices
+    float playerRadius
 );
 
 void playerAnimation(

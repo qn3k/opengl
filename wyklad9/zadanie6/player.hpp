@@ -3,17 +3,20 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include "ground.hpp"
+#include "collider.hpp"
 
 class CPlayer {
 public:
     glm::vec3 position;
     float rotationY;
     CGround* ground;
+    CSphereCollider* collider;
 
     void Init(CGround* g) {
         ground = g;
         position = glm::vec3(0, 0, 0);
         rotationY = 0.0f;
+        collider = new CSphereCollider(this->position, 1.0f);
     }
 
     void Move(float speed) {

@@ -5,6 +5,7 @@
 #include <glm/glm.hpp>
 #include <vector>
 #include <string>
+#include "collider.hpp"
 
 // --- STRUKTURY DANYCH ---
 
@@ -62,6 +63,7 @@ struct SceneObject {
     glm::vec3 color;
     GLuint idTexture; 
     Material mat;     
+    CCollider* collider = nullptr; //kolizje
 };
 
 // --- PROTOTYPY FUNKCJI ---

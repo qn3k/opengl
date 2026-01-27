@@ -375,12 +375,13 @@ void BuildScene(std::vector<SceneObject>& scene, std::vector<CMesh>& meshes, std
     // --- OBIEKT 2: Sześcian ---
     SceneObject box;
     box.mesh = &meshes[1];
-    box.position = glm::vec3(3.0f, 0.0f, -2.0f);
+    box.position = glm::vec3(3.0f, -1.0f, -2.0f);
     box.rotation = glm::vec3(0.0f);
     box.scale = glm::vec3(1.0f);
     box.color = glm::vec3(1.0f); 
     box.idTexture = textures[3]; // Cegły
     box.mat = {0.2f, 0.7f, 0.2f, 10.0f}; // Lekki połysk
+    box.collider = new CAABBCollider(box.position, 1.0f);
     scene.push_back(box);
 
     // --- OBIEKT 3: Sfera (Najlepsza do testu Blinn-Phong!) ---
@@ -393,6 +394,7 @@ void BuildScene(std::vector<SceneObject>& scene, std::vector<CMesh>& meshes, std
     shinyBall.idTexture = 0; // Bez tekstury, żeby lepiej widzieć blask
     // Materiał: wysoki specular (1.0) i mocne skupienie (128.0)
     shinyBall.mat = { 0.1f, 0.5f, 1.0f, 128.0f }; 
+    shinyBall.collider = new CSphereCollider(shinyBall.position, 1.0f);
     scene.push_back(shinyBall);
 
     // --- SFERA 2: MATOWA (Matte) ---
@@ -405,6 +407,7 @@ void BuildScene(std::vector<SceneObject>& scene, std::vector<CMesh>& meshes, std
     matteBall.idTexture = 0;
     // Materiał: specular ustawiony na 0.0 całkowicie wyłącza lśnienie
     matteBall.mat = { 0.2f, 0.8f, 0.0f, 1.0f }; 
+    matteBall.collider = new CSphereCollider(matteBall.position, 1.0f);
     scene.push_back(matteBall);
 
     // --- OBIEKT 4: Małpka ---
@@ -416,6 +419,7 @@ void BuildScene(std::vector<SceneObject>& scene, std::vector<CMesh>& meshes, std
     suzanne.color = glm::vec3(1.0f, 0.8f, 0.1f); 
     suzanne.idTexture = 0;
     suzanne.mat = {0.2f, 0.8f, 0.5f, 32.0f}; // Złoty połysk
+    suzanne.collider = new CSphereCollider(suzanne.position, 1.5f);
     scene.push_back(suzanne);
     /*
     // --- OBIEKT 5: KWIATY ---
@@ -442,7 +446,8 @@ void BuildScene(std::vector<SceneObject>& scene, std::vector<CMesh>& meshes, std
     koliber.scale = glm::vec3(2.0f); 
     koliber.color = glm::vec3(0.1f, 0.5f, 0.4f); 
     koliber.idTexture = 0;
-    koliber.mat = {0.2f, 0.8f, 1.0f, 128.0f}; 
+    koliber.mat = {0.2f, 0.8f, 1.0f, 128.0f};
+    koliber.collider = new CSphereCollider(koliber.position, 1.5f); 
     scene.push_back(koliber);
 
     // --- OBIEKT 7: LUDZIK ---

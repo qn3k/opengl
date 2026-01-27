@@ -1,0 +1,74 @@
+@startuml
+skinparam classAttributeIconSize 0
+
+' ======================
+' Podstawowe klasy
+' ======================
+
+class CMesh {
+  + Init(objFile : string, texFile : string)
+  + Draw()
+}
+
+class CCollider {
+  # position : vec3
+  + TestCollision(other : CCollider*) : bool
+  + SetPosition(pos : vec3)
+}
+
+class CSphereCollider {
+  - radius : float
+}
+
+CCollider <|-- CSphereCollider
+
+
+' ======================
+' Obiekty sceny
+' ======================
+
+class CSceneObject {
+  - mesh : CMesh*
+  - collider : CCollider*
+  - position : vec3
+  - rotation : float
+  + Init(mesh : CMesh*)
+  + Draw()
+  + setPosition(pos : vec3)
+  + getPosition() : vec3
+  + setCollider(col : CCollider*)
+}
+
+CSceneObject o-- CMesh
+CSceneObject o-- CCollider
+
+
+' ======================
+' Player
+' ======================
+
+class CPlayer {
+  - speed : float
+  + Init(mesh : CMesh*)
+  + Move(val : float, obstacle : CSceneObject)
+  + Rotate(angle : float)
+}
+
+CPlayer --|> CSceneObject
+
+
+' ======================
+' Utilities / global
+' ======================
+
+class Utilities {
+  + LoadShader()
+  + UpdateViewMatrix()
+  + __keys[ ]
+}
+
+Utilities ..> CPlayer
+Utilities ..> CSceneObject
+
+
+@enduml

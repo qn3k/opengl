@@ -1,122 +1,116 @@
 #include "PlayerLogic.hpp"
-//#include "SceneManager.hpp"
 #include <cmath>
+#include <algorithm>
 
 extern float GetHeight(float x, float z);
+extern std::vector<glm::mat4> treeMatrices;
 
-//sterowanie postacia
+// 1. Logika fizyki 
+bool checkGlobalCollisions(const glm::vec3& potentialPos, const std::vector<SceneObject>& scene, const PlayerIndices& pIdx) {
+    // 1. Tester pozycji gracza
+    CSphereCollider playerTest(potentialPos, 0.5f); 
+
+    // A. Obiekty ze sceny (Boxy, inne kule)
+    for (size_t i = 0; i < scene.size(); ++i) {
+        // Pomijamy części ciała gracza
+        if ((int)i == pIdx.body || (int)i == pIdx.legR || (int)i == pIdx.legL) continue;
+
+        if (scene[i].collider != nullptr) {
+            // Zawsze wywołujemy isCollision na obiekcie ze sceny.
+            // Jeśli to Box, odpali kod Box vs Sfera.
+            // Jeśli to Sfera, odpali kod Sfera vs Sfera.
+            if (scene[i].collider->isCollision(&playerTest)) {
+                return true; 
+            }
+        }
+    }
+
+    // B. Drzewa (Instanced Rendering)
+    for (const auto& mat : treeMatrices) {
+        // mat[3] to czwarta kolumna macierzy (translacja)
+        glm::vec3 treePos = glm::vec3(mat[3]); 
+        CSphereCollider treeCollider(treePos, 0.4f); 
+        
+        if (treeCollider.isCollision(&playerTest)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+// 2. Obsługa wejścia
 void handleInput(bool* keys, CPlayer& myPlayer, std::vector<SceneObject>& scene, 
                  const std::vector<CMesh>& meshes, const PlayerIndices& pIdx, 
-                 int playerIdx, float playerRadius, const std::vector<glm::mat4>& treeMatrices) {
-    float speed = 0.05f;
-    float rotSpeed = 0.03f;
-    float angleOffset = 1.57f;
+                 int playerIdx, float playerRadius) {
+                 
+    float speed = 0.08f;
+    float rotSpeed = 0.04f;
+    float angleOffset = 1.57f; // Dopasowanie do Twojego modelu OBJ
 
-    // 1. Obrót (zawsze dozwolony)
+    // Obrót
     if (keys[GLFW_KEY_A]) myPlayer.Rotate(rotSpeed);
     if (keys[GLFW_KEY_D]) myPlayer.Rotate(-rotSpeed);
 
-    // 2. Obliczanie potencjalnej nowej pozycji
-    glm::vec3 nextPos = myPlayer.position;
-    bool moving = false;
+    // Obliczanie wektora ruchu
+    glm::vec3 moveDir(0.0f);
+    bool isMoving = false;
 
     if (keys[GLFW_KEY_W]) {
-        nextPos.x += speed * sin(myPlayer.rotationY + angleOffset);
-        nextPos.z += speed * cos(myPlayer.rotationY + angleOffset);
-        moving = true;
+        moveDir.x += sin(myPlayer.rotationY + angleOffset);
+        moveDir.z += cos(myPlayer.rotationY + angleOffset);
+        isMoving = true;
     }
     if (keys[GLFW_KEY_S]) {
-        nextPos.x -= speed * sin(myPlayer.rotationY + angleOffset);
-        nextPos.z -= speed * cos(myPlayer.rotationY + angleOffset);
-        moving = true;
+        moveDir.x -= sin(myPlayer.rotationY + angleOffset);
+        moveDir.z -= cos(myPlayer.rotationY + angleOffset);
+        isMoving = true;
     }
 
-    if (moving) {
-        bool collision = false;
+    if (isMoving) {
+        // Normalizacja, żeby ruch "na skos" nie był szybszy (jeśli dodasz klawisze bocznego ruchu)
+        if (glm::length(moveDir) > 0.0f) moveDir = glm::normalize(moveDir);
 
-        // A. Granice mapy
+        glm::vec3 nextPos = myPlayer.position + moveDir * speed;
+
+        // 1. Sprawdzamy wysokość terenu (czy nie wychodzimy poza mapę)
         float terrainHeight = GetHeight(nextPos.x, nextPos.z);
-        if (terrainHeight < -1000.0f) { 
-            collision = true;
-        }
+        
+        if (terrainHeight > -9000.0f) { // Jeśli jesteśmy na mapie
+            nextPos.y = terrainHeight; // Dopasuj wysokość do terenu
 
-        // B. Kolizje z obiektami ze sceny
-        for (int i = 0; i < scene.size(); i++) {
-            const auto& obj = scene[i];
-
-            // 1. FILTROWANIE: Ignoruj podłogę i WSZYSTKIE części gracza
-            if (obj.mesh == &meshes[0]) continue; 
-            if (i == pIdx.body || i == pIdx.legR || i == pIdx.legL || i == playerIdx) continue;
-
-            // Jeśli obiekt jest znacznie wyżej niż głowa gracza (np. powyżej 5.0f), ignoruj kolizję
-            if (obj.position.y > (nextPos.y + 5.0f)) {
-                continue; 
+            // 2. Sprawdzamy kolizje z obiektami (System Colliderów)
+            if (!checkGlobalCollisions(nextPos, scene, pIdx)) {
+                myPlayer.position = nextPos;
             }
-            
-            // Opcjonalnie: jeśli obiekt jest głęboko pod ziemią, też go ignoruj
-            /*
-            if (obj.position.y < (nextPos.y - 2.0f)) {
-                continue;
-            }
-            */
-
-            // 2. OBLICZENIE DYSTANSU
-            float dist = glm::distance(glm::vec2(nextPos.x, nextPos.z), glm::vec2(obj.position.x, obj.position.z));
-            
-            // 3. DYNAMICZNY PROMIEŃ
-            float objRadius = obj.scale.x; 
-            if (objRadius > 5.0f) objRadius = 2.0f; // Zabezpieczenie przed gigantycznymi obiektami
-
-            float minDistance = playerRadius + (objRadius * 0.5f); 
-            
-            if (dist < minDistance) {
-                collision = true;
-                break;
-            }
-        }
-
-        // C. Kolizje z drzewami (treeMatrices)
-        if (!collision) {
-            for (const auto& treeMat : treeMatrices) {
-                glm::vec3 treePos = glm::vec3(treeMat[3]); 
-                float dist = glm::distance(glm::vec2(nextPos.x, nextPos.z), glm::vec2(treePos.x, treePos.z));
-                if (dist < (playerRadius + 0.3f)) {
-                    collision = true;
-                    break;
-                }
-            }
-        }
-
-        if (!collision) {
-            myPlayer.position = nextPos;
-            myPlayer.position.y = terrainHeight;
         }
     }
 }
 
+// 3. Animacja (bez zmian w logice, tylko synchronizacja)
 void playerAnimation(const bool* keys, CPlayer& myPlayer, std::vector<SceneObject>& scene, const PlayerIndices& pIdx) {
-    if (pIdx.body != -1 && pIdx.legR != -1 && pIdx.legL != -1) {
+    if (pIdx.body == -1) return;
 
-        float t = (float)glfwGetTime();
-        
-        // Sprawdzamy czy gracz trzyma klawisze ruchu
-        bool isMoving = keys[GLFW_KEY_W] || keys[GLFW_KEY_S];
-        
-        // Animacje pomocnicze
-        float bobbing = isMoving ? abs(sin(t * 16.0f)) * 0.05f : 0.0f;
-        float walkAngle = isMoving ? sin(t * 8.0f) * 0.6f : 0.0f;
+    float t = (float)glfwGetTime();
+    bool isMoving = keys[GLFW_KEY_W] || keys[GLFW_KEY_S];
+    
+    float bobbing = isMoving ? abs(sin(t * 16.0f)) * 0.05f : 0.0f;
+    float walkAngle = isMoving ? sin(t * 10.0f) * 0.5f : 0.0f;
 
-        glm::vec3 offset = glm::vec3(0.0f, 0.3f + bobbing, 0.0f); 
-        glm::vec3 p = myPlayer.position + offset;
-        float rotY = myPlayer.rotationY;
+    // Wysokość bazowa ludzika
+    glm::vec3 p = myPlayer.position + glm::vec3(0.0f, 0.4f + bobbing, 0.0f);
+    float rotY = myPlayer.rotationY;
 
-        // Aktualizacja transformacji w scene[]
-        scene[pIdx.body].position = p;
-        scene[pIdx.legR].position = p;
-        scene[pIdx.legL].position = p;
+    // Synchronizacja części ciała z pozycją gracza
+    scene[pIdx.body].position = p;
+    scene[pIdx.legR].position = p;
+    scene[pIdx.legL].position = p;
 
-        scene[pIdx.body].rotation = glm::vec3(0.0f, rotY, 0.0f);
-        scene[pIdx.legR].rotation = glm::vec3(0.0f, rotY, walkAngle); 
-        scene[pIdx.legL].rotation = glm::vec3(0.0f, rotY, -walkAngle);
-    }
+    scene[pIdx.body].rotation.y = rotY;
+    scene[pIdx.legR].rotation.y = rotY;
+    scene[pIdx.legL].rotation.y = rotY;
+
+    // Animacja nóg (rotacja w osi lokalnej dla chodu)
+    scene[pIdx.legR].rotation.z = walkAngle;
+    scene[pIdx.legL].rotation.z = -walkAngle;
 }
