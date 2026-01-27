@@ -4,7 +4,9 @@ out vec4 FragColor;
 in vec3 FragPos;
 in vec3 Normal;
 in vec2 TexCoords;
+in mat3 TBN; //normal mapping
 in vec3 InstanceColor;
+in vec4 FragPosLightSpace;
 
 struct Material {
     float ambient;
@@ -28,9 +30,11 @@ uniform vec3 viewPos;
 uniform bool useLighting;
 uniform bool useBlinnPhong;
 uniform bool isPointLight;
-uniform bool bIsLightSource;
-uniform float uTiling = 1.0; //do heightmap
+uniform bool bIsLightSource;    
+uniform float uTiling = 1.0; //do heightmap albo po prostu tiling
 uniform bool uUseEnvMap; //czy obj korzysta z env mapping
+uniform sampler2D uNormalMap;
+uniform bool uUseNormalMap; 
 
 uniform sampler2D uTextureSampler;
 uniform bool bIsInstanced;
@@ -38,9 +42,7 @@ uniform bool bUseTexture;
 uniform vec3 uColor;
 uniform Material material;
 
-in vec4 FragPosLightSpace;
 uniform sampler2D tex_shadowMap;
-
 uniform samplerCube tex_skybox;
 uniform float reflectionFactor; // 0.0 = brak odbić, 1.0 = czyste lustro
 
@@ -112,36 +114,36 @@ void main()
         return;
     }
 
-    // --- 1. LOGIKA KOLORU I ALFY (ALBEDO) ---
+    // --- 1. LOGIKA KOLORU ---
     vec3 albedo;
     float finalAlpha = 1.0;
     vec2 finalUV = TexCoords * uTiling; 
 
     if(bUseTexture) {
-        // Obiekty z teksturą (np. Kwiaty)
         vec4 texColor = texture(uTextureSampler, finalUV);
-        
-        // Jeśli instancjonujemy kwiaty, InstanceColor może służyć jako odcień (tint)
-        // Jeśli nie instancjonujemy, używamy czystej tekstury
         vec3 tint = bIsInstanced ? InstanceColor : vec3(1.0);
         albedo = texColor.rgb * tint;
         finalAlpha = texColor.a;
-
-        // Discard tylko dla obiektów z przezroczystością tekstury
         if(finalAlpha < 0.1) discard; 
-    } 
-    else {
-        // Obiekty bez tekstury (np. Drzewa / Sześciany)
-        // Priorytet ma kolor instancji, potem kolor z uniformu
+    } else {
         albedo = bIsInstanced ? InstanceColor : uColor;
-        finalAlpha = 1.0;
     }
 
-    // --- 2. PRZYGOTOWANIE WEKTORÓW ---
-    vec3 norm = normalize(Normal);
+    // --- 2. NORMAL MAPPING ---
+    vec3 norm;
+    if(uUseNormalMap) {
+        // Pobieramy normalną z tekstury i mapujemy z [0,1] na [-1,1]
+        norm = texture(uNormalMap, finalUV).rgb;
+        norm = normalize(norm * 2.0 - 1.0);
+        // Przekształcamy normalną z przestrzeni stycznej do przestrzeni świata
+        norm = normalize(TBN * norm);
+    } else {
+        norm = normalize(Normal);
+    }
+
     vec3 viewDir = normalize(viewPos - FragPos);
 
-    // --- 3. ODBICIA (SKYBOX) ---
+    // --- 3. ODBICIA ---
     vec3 I = normalize(FragPos - viewPos);
     vec3 R = reflect(I, norm);
     vec3 envColor = texture(tex_skybox, R).rgb;
@@ -151,18 +153,15 @@ void main()
 
     if(!useLighting) {
         lightingResult = albedo;
-    }
-    else {
+    } else {
         if(!isPointLight) {
-            // TRYB KIERUNKOWY 
+            //TRYB KIERUNKOWY
             vec3 lightDir = normalize(-dirLightDirection);
             float shadow = ShadowCalculation(FragPosLightSpace, norm, lightDir);
             
             float lightIntensity = 0.8; 
             vec3 effColor = lightColor * lightIntensity;
-
             vec3 ambient = material.ambient * effColor * albedo;
-            
             float diff = max(dot(norm, lightDir), 0.0);
             vec3 diffuse = (material.diffuse * diff) * effColor * albedo;
 
@@ -174,31 +173,22 @@ void main()
                 vec3 reflectDir = reflect(-lightDir, norm);
                 spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
             }
-            vec3 specular = (material.specular * spec) * effColor;
-
-            lightingResult = ambient + (1.0 - shadow) * (diffuse + specular);
-        }
-        else {
-            // TRYB PUNKTOWY (Lampy)
+            lightingResult = ambient + (1.0 - shadow) * (diffuse + (material.specular * spec) * effColor);
+        } else {
             for(int i = 0; i < activeLightsCount; i++) {
-                // PRZEKAZUJEMY OBLICZONE ALBEDO
                 lightingResult += CalcPointLight(lights[i], norm, FragPos, viewDir, albedo);
             }
         }
     }
 
-    // --- 5. FINALNY MIX (Odbicia + Mgła) ---
+    // --- 5. FINALNY MIX ---
     vec3 finalColor = lightingResult;
     if(uUseEnvMap && reflectionFactor > 0.0) {
         finalColor = mix(lightingResult, envColor, reflectionFactor);
     }
 
-    // Mgła
     float dist = length(viewPos - FragPos);
     float fogFactor = clamp((dist - 60.0) / (120.0 - 60.0), 0.0, 1.0);
     vec3 fogColor = vec3(0.7, 0.75, 0.8); 
-    
-    vec3 colorWithFog = mix(finalColor, fogColor, fogFactor);
-
-    FragColor = vec4(colorWithFog, finalAlpha);
+    FragColor = vec4(mix(finalColor, fogColor, fogFactor), finalAlpha);
 }

@@ -37,7 +37,7 @@ float GetHeight(float x, float z);
 class CMesh {
 public:
     GLuint idVAO = 0;
-    GLuint idVBO_pos, idVBO_norm, idVBO_uv;
+    GLuint idVBO_pos, idVBO_norm, idVBO_uv, idVBO_tang = 0;
     GLuint idVBO_instance = 0; // Nowy bufor na macierze instancji
     GLuint idEBO = 0;
     std::vector<glm::vec3> vertices;
@@ -62,6 +62,7 @@ struct SceneObject {
     glm::vec3 scale;
     glm::vec3 color;
     GLuint idTexture; 
+    GLuint idNormalMap = 0; 
     Material mat;     
     CCollider* collider = nullptr; //kolizje
 };
@@ -69,6 +70,7 @@ struct SceneObject {
 // --- PROTOTYPY FUNKCJI ---
 GLuint LoadTexture(const char* path, bool flip = true);
 GLuint LoadCubemap(std::vector<std::string> faces);
+CMesh loader(const char* path);
 void InitializeResources(std::vector<CMesh>& meshes, std::vector<GLuint>& textures);
 void BuildScene(std::vector<SceneObject>& scene, std::vector<CMesh>& meshes, std::vector<GLuint>& textures);
 void LoadHeightmap(const char* filename, std::vector<TerrainVertex>& vertices, std::vector<unsigned int>& indices);

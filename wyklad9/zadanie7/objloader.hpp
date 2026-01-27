@@ -23,7 +23,6 @@
 // Naglowek funkcji
 bool loadOBJ(const char * Filename, std::vector<glm::vec3> & out_coords, std::vector<glm::vec2> & out_uvs, std::vector<glm::vec3> & out_normals);
 
-
 // Implementacja
 inline bool loadOBJ(const char * Filename, std::vector<glm::vec3> & out_coords, std::vector<glm::vec2> & out_uvs, std::vector<glm::vec3> & out_normals)
 {
@@ -204,6 +203,52 @@ inline bool loadOBJ(const char * Filename, std::vector<glm::vec3> & out_coords, 
 	file.close();
 	std::cout << " done.\n";
 	return true;
+}
+
+//normal mapping
+static inline void calculateTangents(
+    const std::vector<glm::vec3>& vertices,
+    const std::vector<glm::vec2>& uvs,
+    const std::vector<glm::vec3>& normals,
+    std::vector<glm::vec3>& out_tangents
+) {
+    out_tangents.resize(vertices.size(), glm::vec3(0.0f));
+
+    for (size_t i = 0; i < vertices.size(); i += 3) {
+        // Trzy wierzchołki trójkąta
+        glm::vec3 v0 = vertices[i];
+        glm::vec3 v1 = vertices[i+1];
+        glm::vec3 v2 = vertices[i+2];
+
+        // Odpowiadające im współrzędne UV
+        glm::vec2 uv0 = uvs[i];
+        glm::vec2 uv1 = uvs[i+1];
+        glm::vec2 uv2 = uvs[i+2];
+
+        // Krawędzie pozycji i różnice UV
+        glm::vec3 edge1 = v1 - v0;
+        glm::vec3 edge2 = v2 - v0;
+        glm::vec2 deltaUV1 = uv1 - uv0;
+        glm::vec2 deltaUV2 = uv2 - uv0;
+
+        // Matematyka obliczania Tangent
+        float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+
+        glm::vec3 tangent;
+        tangent.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
+        tangent.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
+        tangent.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
+
+        // Przypisujemy ten sam tangent do wszystkich 3 wierzchołków trójkąta
+        out_tangents[i] += tangent;
+        out_tangents[i+1] += tangent;
+        out_tangents[i+2] += tangent;
+    }
+
+    // Normalizacja
+    for (size_t i = 0; i < out_tangents.size(); i++) {
+        out_tangents[i] = glm::normalize(out_tangents[i]);
+    }
 }
 
 #endif

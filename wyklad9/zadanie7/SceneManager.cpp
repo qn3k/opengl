@@ -1,5 +1,5 @@
-#include "SceneManager.hpp"
 #include "objloader.hpp"
+#include "SceneManager.hpp"
 #include "stb_image.h"
 #include <stdio.h>
 #include <glm/gtc/matrix_transform.hpp>
@@ -76,25 +76,33 @@ float GetHeight(float x, float z) {
 bool CMesh::Load(const char* path) {
     std::vector<glm::vec2> uvs;
     std::vector<glm::vec3> normals;
-    
+    std::vector<glm::vec3> tangents; 
+
+    // 1. Wczytujemy dane
     if (!loadOBJ(path, this->vertices, uvs, normals)) return false;
+
+    // 2. obliczamy tangenty
+    calculateTangents(this->vertices, uvs, normals, tangents);
 
     vertexCount = this->vertices.size();
     glGenVertexArrays(1, &idVAO);
     glBindVertexArray(idVAO);
 
+    // VBO Pozycje (indeks 0)
     glGenBuffers(1, &idVBO_pos);
     glBindBuffer(GL_ARRAY_BUFFER, idVBO_pos);
     glBufferData(GL_ARRAY_BUFFER, this->vertices.size() * sizeof(glm::vec3), &this->vertices[0], GL_STATIC_DRAW);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, NULL);
     glEnableVertexAttribArray(0);
 
+    // VBO Normalne (indeks 2)
     glGenBuffers(1, &idVBO_norm);
     glBindBuffer(GL_ARRAY_BUFFER, idVBO_norm);
     glBufferData(GL_ARRAY_BUFFER, normals.size() * sizeof(glm::vec3), &normals[0], GL_STATIC_DRAW);
     glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 0, NULL);
     glEnableVertexAttribArray(2);
     
+    // VBO UV (indeks 1)
     if (!uvs.empty()) {
         glGenBuffers(1, &idVBO_uv);
         glBindBuffer(GL_ARRAY_BUFFER, idVBO_uv);
@@ -102,8 +110,17 @@ bool CMesh::Load(const char* path) {
         glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, NULL);
         glEnableVertexAttribArray(1);
     }
+
+    // VBO dla Tangentów (indeks 11)
+    GLuint idVBO_tang;
+    glGenBuffers(1, &idVBO_tang);
+    glBindBuffer(GL_ARRAY_BUFFER, idVBO_tang);
+    glBufferData(GL_ARRAY_BUFFER, tangents.size() * sizeof(glm::vec3), &tangents[0], GL_STATIC_DRAW);
+    glVertexAttribPointer(11, 3, GL_FLOAT, GL_FALSE, 0, NULL); 
+    glEnableVertexAttribArray(11);
+
     glBindVertexArray(0);
-    this->usesIndices = false; // Pliki OBJ loadera używają DrawArrays
+    this->usesIndices = false;
     return true;
 }
 
@@ -134,7 +151,8 @@ void CMesh::Release() {
     glDeleteBuffers(1, &idVBO_pos); 
     glDeleteBuffers(1, &idVBO_norm); 
     glDeleteBuffers(1, &idVBO_uv); 
-    if (usesIndices) glDeleteBuffers(1, &idEBO); // dodano do obslugi heightmap
+    // glDeleteBuffers(1, &idVBO_tang); 
+    if (usesIndices) glDeleteBuffers(1, &idEBO); //heightmap
     glDeleteVertexArrays(1, &idVAO); 
 }
 
@@ -382,6 +400,7 @@ void InitializeResources(std::vector<CMesh>& meshes, std::vector<GLuint>& textur
     textures.push_back(LoadTexture("textures/flower32bit.png"));
     textures.push_back(LoadTexture("textures/sand.png"));
     textures.push_back(LoadTexture("textures/lego.png")); //6
+    textures.push_back(LoadTexture("textures/brick_normal.png")); //7
 }
 
 void BuildScene(std::vector<SceneObject>& scene, std::vector<CMesh>& meshes, std::vector<GLuint>& textures) {
@@ -403,7 +422,7 @@ void BuildScene(std::vector<SceneObject>& scene, std::vector<CMesh>& meshes, std
     ground.mesh = &meshes[0];
     ground.idTexture = textures[5];
     ground.position = glm::vec3(0.0f, 0.0f, 0.0f); 
-    ground.scale = glm::vec3(4.0f, 1.0f, 4.0f);    //powiekszenie razy 2
+    ground.scale = glm::vec3(4.0f, 1.0f, 4.0f);    //powiekszenie razy 4
     ground.rotation = glm::vec3(0.0f, 0.0f, 0.0f);
     ground.color = glm::vec3(1.0f);
     ground.mat = {0.2f, 0.8f, 0.1f, 32.0f};   // Parametry materiału
@@ -419,6 +438,7 @@ void BuildScene(std::vector<SceneObject>& scene, std::vector<CMesh>& meshes, std
     box.idTexture = textures[3]; // Cegły
     box.mat = {0.2f, 0.7f, 0.2f, 10.0f}; // Lekki połysk
     box.collider = new CAABBCollider(box.position, 1.0f);
+    box.idNormalMap = textures[7]; //normalmapa cegiel
     scene.push_back(box);
 
     // --- OBIEKT 3: Sfera (Najlepsza do testu Blinn-Phong!) ---

@@ -15,7 +15,7 @@
 // Musimy zadeklarować matProj tutaj, bo utilities.hpp go używa
 int windowWidth = 800;
 int windowHeight = 600;
-const char* windowTitle = "Projekt beta v0.1";
+const char* windowTitle = "Projekt beta v0.2";
 glm::mat4 matProj;
 glm::vec3 lightColor = glm::vec3(1.0f, 1.0f, 1.0f); // Domyślnie białe
 
@@ -209,6 +209,9 @@ void DrawWorld(glm::mat4 projection, glm::mat4 view, glm::vec3 camPos) {
     glBindTexture(GL_TEXTURE_2D, DepthMap_idTexture);
     glUniform1i(glGetUniformLocation(idProgram, "tex_shadowMap"), 2);
 
+    GLint loc_uNormalMap = glGetUniformLocation(idProgram, "uNormalMap");
+    GLint loc_uUseNormalMap = glGetUniformLocation(idProgram, "uUseNormalMap");
+
     // --- OBIEKTY SCENY ---
     for (const auto& obj : scene) {
         glm::mat4 matModel = glm::mat4(1.0);
@@ -234,6 +237,16 @@ void DrawWorld(glm::mat4 projection, glm::mat4 view, glm::vec3 camPos) {
             glUniform1i(loc_bUseTexture, 1);
         } else {
             glUniform1i(loc_bUseTexture, 0);
+        }
+
+        // idNormalMap
+        if (obj.idNormalMap > 0) { 
+            glActiveTexture(GL_TEXTURE3); // Używamy slotu 3 (0-Albedo, 1-Skybox, 2-Shadow)
+            glBindTexture(GL_TEXTURE_2D, obj.idNormalMap);
+            glUniform1i(loc_uNormalMap, 3);
+            glUniform1i(loc_uUseNormalMap, 1);
+        } else {
+            glUniform1i(loc_uUseNormalMap, 0);
         }
         glUniform3fv(glGetUniformLocation(idProgram, "uColor"), 1, glm::value_ptr(obj.color));
 
