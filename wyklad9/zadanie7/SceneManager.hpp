@@ -53,6 +53,7 @@ public:
     static CMesh CreateFlowerMesh();
     void CreateFromHeightmap(const std::vector<TerrainVertex>& vertices, const std::vector<unsigned int>& indices);
     void PrepareInstancing(const std::vector<glm::mat4>& matrices, const std::vector<glm::vec3>& colors);
+    glm::vec3 calculateHalfSizes();
 };
 
 struct SceneObject {

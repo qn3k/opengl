@@ -52,6 +52,7 @@ bool canMove = true;
 bool playerArrow = true;
 float playerRadius = 0.5f;
 extern std::vector<glm::mat4> treeMatrices;
+float normalStrength = 1.0f;
 
 // --- STRUKTURA ŚWIATŁA ---
 struct PointLight {
@@ -192,6 +193,9 @@ void DrawWorld(glm::mat4 projection, glm::mat4 view, glm::vec3 camPos) {
     meshes[4].Draw(); 
     //drzewa
     glUniform1i(loc_bUseTexture, 0);
+    glUniform1f(glGetUniformLocation(idProgram, "material.ambient"), 0.3f);
+    glUniform1f(glGetUniformLocation(idProgram, "material.specular"), 0.1f);
+    glUniform1f(glGetUniformLocation(idProgram, "material.shininess"), 32.0f);
     glUniform3f(glGetUniformLocation(idProgram, "uColor"), 1.0f, 1.0f, 1.0f);
     meshes[11].Draw(); 
 
@@ -252,6 +256,7 @@ void DrawWorld(glm::mat4 projection, glm::mat4 view, glm::vec3 camPos) {
 
         // Tiling podłoża
         if (obj.mesh == &meshes[0]) glUniform1f(locTiling, 8.0f); 
+        else if (obj.mesh == &meshes[12]) glUniform1f(locTiling, 2.0f);
         else glUniform1f(locTiling, 1.0f);
 
         // Env mapping (Koliber)
@@ -261,6 +266,10 @@ void DrawWorld(glm::mat4 projection, glm::mat4 view, glm::vec3 camPos) {
         } else {
             glUniform1i(glGetUniformLocation(idProgram, "uUseEnvMap"), 0);
         }
+
+        // Gdzieś w pętli rysowania, przed narysowaniem prostopadłościanu:
+        int strengthLoc = glGetUniformLocation(idProgram, "uNormalStrength");
+        glUniform1f(strengthLoc, normalStrength); 
 
         obj.mesh->Draw();
     }
@@ -559,6 +568,10 @@ void DisplayScene() {
     ImGui::Text("\nWybierz Skybox:");
     ImGui::RadioButton("Jeden", &currentSkybox, 0);
     ImGui::RadioButton("Dwa", &currentSkybox, 1);
+
+    ImGui::Begin("Ustawienia Materialu");
+    ImGui::SliderFloat("Sila Normal Mapy", &normalStrength, 0.0f, 5.0f); // Zakres od 0 (płaskie) do 5 (bardzo wypukłe)
+    ImGui::End();
 
     ImGui::End();
 

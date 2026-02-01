@@ -252,7 +252,7 @@ GLuint LoadCubemap(std::vector<std::string> faces) {
 
 void InitializeResources(std::vector<CMesh>& meshes, std::vector<GLuint>& textures) {
     CMesh mGround, mCube, mSphere, mMonkey,mKoliber ,mFlower, mTerrain, playerObj,
-    playerBody, playerLegR, playerLegL,mTree;
+    playerBody, playerLegR, playerLegL,mTree, mWall_1,mWall_2;
     mGround.Load("obj/scene-plane.obj"); 
     mCube.Load("obj/cube.obj");
     mSphere.Load("obj/sphere.obj");
@@ -266,6 +266,8 @@ void InitializeResources(std::vector<CMesh>& meshes, std::vector<GLuint>& textur
     playerLegR.Load("obj/noga_prawa.obj"); 
     playerLegL.Load("obj/noga_lewa.obj");
     mTree.Load("obj/tree.obj");  
+    mWall_1.Load("obj/wall_1.obj");
+    mWall_2.Load("obj/wall_2.obj");
     mFlower = CMesh::CreateFlowerMesh();
 
     //do heightmapa
@@ -290,6 +292,8 @@ void InitializeResources(std::vector<CMesh>& meshes, std::vector<GLuint>& textur
     meshes.push_back(playerLegR); //9
     meshes.push_back(playerLegL); //10
     meshes.push_back(mTree); //11
+    meshes.push_back(mWall_1); //12
+    meshes.push_back(mWall_2); //13
 
     //gdzie jest ziemia
     groundMeshPtr = &meshes[0];
@@ -401,6 +405,9 @@ void InitializeResources(std::vector<CMesh>& meshes, std::vector<GLuint>& textur
     textures.push_back(LoadTexture("textures/sand.png"));
     textures.push_back(LoadTexture("textures/lego.png")); //6
     textures.push_back(LoadTexture("textures/brick_normal.png")); //7
+    textures.push_back(LoadTexture("textures/leaves.png")); //8
+    textures.push_back(LoadTexture("textures/leaves_normal.png")); //9
+    textures.push_back(0); //10
 }
 
 void BuildScene(std::vector<SceneObject>& scene, std::vector<CMesh>& meshes, std::vector<GLuint>& textures) {
@@ -437,7 +444,7 @@ void BuildScene(std::vector<SceneObject>& scene, std::vector<CMesh>& meshes, std
     box.color = glm::vec3(1.0f); 
     box.idTexture = textures[3]; // Cegły
     box.mat = {0.2f, 0.7f, 0.2f, 10.0f}; // Lekki połysk
-    box.collider = new CAABBCollider(box.position, 1.0f);
+    box.collider = new CAABBCollider(box.position, box.mesh->calculateHalfSizes() * box.scale); 
     box.idNormalMap = textures[7]; //normalmapa cegiel
     scene.push_back(box);
 
@@ -563,6 +570,32 @@ void BuildScene(std::vector<SceneObject>& scene, std::vector<CMesh>& meshes, std
     pIdx.legL = scene.size() - 1;
 
     //int playerSceneIndex = scene.size() - 1;
+
+    // --- OBIEKT 11: Sciana poziom ---
+    SceneObject wall_1;
+    wall_1.mesh = &meshes[12];
+    wall_1.position = glm::vec3(5.0f, -1.0f, 5.0f);
+    wall_1.rotation = glm::vec3(0.0f);
+    wall_1.scale = glm::vec3(1.0f);
+    wall_1.color = glm::vec3(1.0f); 
+    wall_1.idTexture = textures[8]; // liscie
+    wall_1.mat = {0.2f, 0.7f, 0.2f, 10.0f}; // Lekki połysk
+    wall_1.collider = new CAABBCollider(wall_1.position, wall_1.mesh->calculateHalfSizes() * wall_1.scale);
+    wall_1.idNormalMap = textures[9]; //normalmapa lisci
+    scene.push_back(wall_1);
+
+    // --- OBIEKT 12: Sciana pion ---
+    SceneObject wall_2;
+    wall_2.mesh = &meshes[13];
+    wall_2.position = glm::vec3(8.0f, -1.0f, 6.0f);
+    wall_2.rotation = glm::vec3(0.0f);
+    wall_2.scale = glm::vec3(1.0f);
+    wall_2.color = glm::vec3(1.0f); 
+    wall_2.idTexture = textures[8]; // liscie
+    wall_2.mat = {0.2f, 0.7f, 0.2f, 10.0f}; // Lekki połysk
+    wall_2.collider = new CAABBCollider(wall_2.position, wall_2.mesh->calculateHalfSizes() * wall_2.scale);
+    wall_2.idNormalMap = textures[9]; //normalmapa lisci
+    scene.push_back(wall_2);
 }
 
 void LoadHeightmap(const char* filename, std::vector<TerrainVertex>& vertices, std::vector<unsigned int>& indices) {
@@ -693,4 +726,18 @@ void CMesh::PrepareInstancing(const std::vector<glm::mat4>& matrices, const std:
     glVertexAttribDivisor(7, 1); 
 
     glBindVertexArray(0);
+}
+
+glm::vec3 CMesh::calculateHalfSizes() {
+    if (vertices.empty()) return glm::vec3(0.0f);
+    
+    glm::vec3 minV = vertices[0];
+    glm::vec3 maxV = vertices[0];
+    
+    for (const auto& v : vertices) {
+        minV = glm::min(minV, v);
+        maxV = glm::max(maxV, v);
+    }
+    // Połowa różnicy między max a min to nasze HalfSizes
+    return (maxV - minV) * 0.5f;
 }

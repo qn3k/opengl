@@ -35,6 +35,7 @@ uniform float uTiling = 1.0; //do heightmap albo po prostu tiling
 uniform bool uUseEnvMap; //czy obj korzysta z env mapping
 uniform sampler2D uNormalMap;
 uniform bool uUseNormalMap; 
+uniform float uNormalStrength;
 
 uniform sampler2D uTextureSampler;
 uniform bool bIsInstanced;
@@ -135,6 +136,7 @@ void main()
         // Pobieramy normalną z tekstury i mapujemy z [0,1] na [-1,1]
         norm = texture(uNormalMap, finalUV).rgb;
         norm = normalize(norm * 2.0 - 1.0);
+        norm.xy *= uNormalStrength;; 
         // Przekształcamy normalną z przestrzeni stycznej do przestrzeni świata
         norm = normalize(TBN * norm);
     } else {
