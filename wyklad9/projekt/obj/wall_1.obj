@@ -1,0 +1,59 @@
+# Prostopadloscian OBJ - Tiling 2:1
+o Prostopadloscian
+
+# Wierzcholki (X skorygowane do -1.0 / 1.0 dla skali 2.0)
+v -1.0 -1.0  1.0
+v  1.0 -1.0  1.0
+v -1.0  1.0  1.0
+v  1.0  1.0  1.0
+v -1.0  1.0 -1.0
+v  1.0  1.0 -1.0
+v -1.0 -1.0 -1.0
+v  1.0 -1.0 -1.0
+
+# Wspolrzedne UV (Tekstura)
+# Dla scian szerokich (przod, tyl, gora, dol) - powtorzenie 2x w poziomie
+vt 0.0 0.0
+vt 2.0 0.0
+vt 0.0 1.0
+vt 2.0 1.0
+
+# Dla scian bocznych (prawa, lewa) - powtorzenie 1x1 (standard)
+vt 0.0 0.0
+vt 1.0 0.0
+vt 0.0 1.0
+vt 1.0 1.0
+
+# Normalne (Wektory prostopadle do scian)
+vn  0.0  0.0  1.0
+vn  0.0  0.0 -1.0
+vn  0.0  1.0  0.0
+vn  0.0 -1.0  0.0
+vn  1.0  0.0  0.0
+vn -1.0  0.0  0.0
+
+# Scianki (v/vt/vn)
+
+# PRZOD (Tiling 2x1)
+f 1/1/1 2/2/1 4/4/1
+f 4/4/1 3/3/1 1/1/1
+
+# TYL (Tiling 2x1)
+f 8/1/2 7/2/2 5/4/2
+f 5/4/2 6/3/2 8/1/2
+
+# GORA (Tiling 2x1)
+f 3/1/3 4/2/3 6/4/3
+f 6/4/3 5/3/3 3/1/3
+
+# DOL (Tiling 2x1)
+f 7/1/4 8/2/4 2/4/4
+f 2/4/4 1/3/4 7/1/4
+
+# PRAWA (Tiling 1x1 - uzywamy vt 5, 6, 7, 8)
+f 2/5/5 8/6/5 6/8/5
+f 6/8/5 4/7/5 2/5/5
+
+# LEWA (Tiling 1x1 - uzywamy vt 5, 6, 7, 8)
+f 7/5/6 1/6/6 3/8/6
+f 3/8/6 5/7/6 7/5/6
