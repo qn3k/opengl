@@ -1,59 +1,70 @@
-    #pragma once
-    #include <glad/glad.h>
-    #include <glm/glm.hpp>
-    #include <vector>
-    #include <string>
-    #include <cstdio> 
+#pragma once
+#include <glad/glad.h>
+#include <glm/glm.hpp>
+#include <vector>
+#include <string>
+#include <cstdio> 
 
-    // ----------------------------------------------------------------
-    // Klasa abstrakcyjna obiektu kolizyjnego
-    // ----------------------------------------------------------------
-    class CCollider
+//typy kolizji
+enum class ColliderType {
+WALL,       // Zwykła przeszkoda (blokuje ruch)
+TRIGGER,    // Np. wejście do nowej strefy (nie blokuje, ale wyzwala akcję)
+DAMAGE,     // Kolczatka/Lawa (zadaje obrażenia)
+COLLECTIBLE // Moneta/Przedmiot
+};
+
+// ----------------------------------------------------------------
+// Klasa abstrakcyjna obiektu kolizyjnego
+// ----------------------------------------------------------------
+class CCollider
+{
+public:
+    ColliderType Type;
+
+    CCollider(ColliderType type) : Type(type) {}
+    virtual ~CCollider() = default;
+
+    virtual bool isCollision(const CCollider * other) const = 0;
+};
+
+// ----------------------------------------------------------------
+// Kolider Sferyczny
+// ----------------------------------------------------------------
+class CSphereCollider : public CCollider
+{
+public:
+    glm::vec3 Position; 
+    float Radius;
+
+    CSphereCollider(const glm::vec3& pos, float r, ColliderType type = ColliderType::WALL)
+    : CCollider(type), Position(pos), Radius(r) 
+    {}
+
+    virtual bool isCollision(const CCollider *_other) const override
     {
-    public:
-        virtual ~CCollider() = default;
-
-        virtual bool isCollision(const CCollider * other) const = 0;
-    };
-
-    // ----------------------------------------------------------------
-    // Kolider Sferyczny
-    // ----------------------------------------------------------------
-    class CSphereCollider : public CCollider
-    {
-    public:
-        glm::vec3 Position; 
-        float Radius;
-
-        CSphereCollider(const glm::vec3& pos, float r)
-            : Position(pos), Radius(r)
-        { }
-
-        virtual bool isCollision(const CCollider *_other) const override
-        {
-            const CSphereCollider *otherSphere = dynamic_cast<const CSphereCollider*>(_other);
-            if (otherSphere) {
-                float distance = glm::distance(this->Position, otherSphere->Position);
-                return distance < (this->Radius + otherSphere->Radius);
-            }
-
-            return _other->isCollision(this);
+        const CSphereCollider *otherSphere = dynamic_cast<const CSphereCollider*>(_other);
+        if (otherSphere) {
+            float distance = glm::distance(this->Position, otherSphere->Position);
+            return distance < (this->Radius + otherSphere->Radius);
         }
-    };
 
-    // ----------------------------------------------------------------
-    // Axis Aligned Bounding Box (AABB)
-    // ----------------------------------------------------------------
-    class CAABBCollider : public CCollider
+        return _other->isCollision(this);
+    }
+};
+
+// ----------------------------------------------------------------
+// Axis Aligned Bounding Box (AABB)
+// ----------------------------------------------------------------
+class CAABBCollider : public CCollider
 {
 public:
     glm::vec3 Position; 
     glm::vec3 HalfSizes; // Zamiast float Length, używamy wektora
 
     // Konstruktor przyjmujący wektor wymiarów
-    CAABBCollider(const glm::vec3& pos, const glm::vec3& halfSizes)
-        : Position(pos), HalfSizes(halfSizes)
-    { }
+    CAABBCollider(const glm::vec3& pos, const glm::vec3& halfSizes, ColliderType type = ColliderType::WALL)
+    : CCollider(type), Position(pos), HalfSizes(halfSizes) 
+    {}
 
     virtual bool isCollision(const CCollider *_other) const override
     {

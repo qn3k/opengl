@@ -16,7 +16,7 @@ public:
         ground = g;
         position = glm::vec3(0, 0, 0);
         rotationY = 0.0f;
-        collider = new CSphereCollider(this->position, 1.0f);
+        collider = new CSphereCollider(this->position, 1.0f, ColliderType::WALL);
     }
 
     void Move(float speed) {

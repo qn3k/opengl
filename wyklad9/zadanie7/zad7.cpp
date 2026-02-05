@@ -218,6 +218,7 @@ void DrawWorld(glm::mat4 projection, glm::mat4 view, glm::vec3 camPos) {
 
     // --- OBIEKTY SCENY ---
     for (const auto& obj : scene) {
+        if (obj.isCollected) continue;
         glm::mat4 matModel = glm::mat4(1.0);
         matModel = glm::translate(matModel, obj.position);
         matModel = glm::rotate(matModel, obj.rotation.y, glm::vec3(0, 1, 0));  

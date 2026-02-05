@@ -444,7 +444,7 @@ void BuildScene(std::vector<SceneObject>& scene, std::vector<CMesh>& meshes, std
     box.color = glm::vec3(1.0f); 
     box.idTexture = textures[3]; // Cegły
     box.mat = {0.2f, 0.7f, 0.2f, 10.0f}; // Lekki połysk
-    box.collider = new CAABBCollider(box.position, box.mesh->calculateHalfSizes() * box.scale); 
+    box.collider = new CAABBCollider(box.position, box.mesh->calculateHalfSizes() * box.scale, ColliderType::WALL); 
     box.idNormalMap = textures[7]; //normalmapa cegiel
     scene.push_back(box);
 
@@ -580,7 +580,7 @@ void BuildScene(std::vector<SceneObject>& scene, std::vector<CMesh>& meshes, std
     wall_1.color = glm::vec3(1.0f); 
     wall_1.idTexture = textures[8]; // liscie
     wall_1.mat = {0.2f, 0.7f, 0.2f, 10.0f}; // Lekki połysk
-    wall_1.collider = new CAABBCollider(wall_1.position, wall_1.mesh->calculateHalfSizes() * wall_1.scale);
+    wall_1.collider = new CAABBCollider(wall_1.position, wall_1.mesh->calculateHalfSizes() * wall_1.scale, ColliderType::WALL);
     wall_1.idNormalMap = textures[9]; //normalmapa lisci
     scene.push_back(wall_1);
 
@@ -593,7 +593,7 @@ void BuildScene(std::vector<SceneObject>& scene, std::vector<CMesh>& meshes, std
     wall_2.color = glm::vec3(1.0f); 
     wall_2.idTexture = textures[8]; // liscie
     wall_2.mat = {0.2f, 0.7f, 0.2f, 10.0f}; // Lekki połysk
-    wall_2.collider = new CAABBCollider(wall_2.position, wall_2.mesh->calculateHalfSizes() * wall_2.scale);
+    wall_2.collider = new CAABBCollider(wall_2.position, wall_2.mesh->calculateHalfSizes() * wall_2.scale, ColliderType::COLLECTIBLE);
     wall_2.idNormalMap = textures[9]; //normalmapa lisci
     scene.push_back(wall_2);
 }

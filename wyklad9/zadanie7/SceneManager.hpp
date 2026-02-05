@@ -66,6 +66,7 @@ struct SceneObject {
     GLuint idNormalMap = 0; 
     Material mat;     
     CCollider* collider = nullptr; //kolizje
+    bool isCollected = false;
 };
 
 // --- PROTOTYPY FUNKCJI ---

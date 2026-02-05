@@ -6,21 +6,40 @@ extern float GetHeight(float x, float z);
 extern std::vector<glm::mat4> treeMatrices;
 
 // 1. Logika fizyki 
-bool checkGlobalCollisions(const glm::vec3& potentialPos, const std::vector<SceneObject>& scene, const PlayerIndices& pIdx) {
-    // 1. Tester pozycji gracza
-    CSphereCollider playerTest(potentialPos, 0.5f); 
+bool checkGlobalCollisions(const glm::vec3& potentialPos, std::vector<SceneObject>& scene, const PlayerIndices& pIdx) {
+    CSphereCollider playerTest(potentialPos, 0.5f, ColliderType::WALL); 
+    bool movementBlocked = false;
 
-    // A. Obiekty ze sceny (Boxy, inne kule)
+    // A. Obiekty ze sceny
     for (size_t i = 0; i < scene.size(); ++i) {
-        // Pomijamy części ciała gracza
+        if (scene[i].isCollected) continue;
         if ((int)i == pIdx.body || (int)i == pIdx.legR || (int)i == pIdx.legL) continue;
 
         if (scene[i].collider != nullptr) {
-            // Zawsze wywołujemy isCollision na obiekcie ze sceny.
-            // Jeśli to Box, odpali kod Box vs Sfera.
-            // Jeśli to Sfera, odpali kod Sfera vs Sfera.
             if (scene[i].collider->isCollision(&playerTest)) {
-                return true; 
+                
+                // --- LOGIKA TYPÓW KOLIZJI ---
+                switch (scene[i].collider->Type) {
+                    case ColliderType::WALL:
+                        movementBlocked = true; // Ściana blokuje ruch
+                        break;
+
+                    case ColliderType::DAMAGE:
+                        // playerHealth -= 0.1f; 
+                        movementBlocked = true; // Może też blokować przejście
+                        break;
+
+                    case ColliderType::COLLECTIBLE:
+                        // Jeśli to moneta, "usuń" ją ze świata
+                        scene[i].isCollected = true;
+                        printf("Zebrałeś przedmiot!\n");
+                        // Przedmiot nie blokuje ruchu
+                        break;
+
+                    case ColliderType::TRIGGER:
+                        //default
+                        break;
+                }
             }
         }
     }
@@ -29,14 +48,14 @@ bool checkGlobalCollisions(const glm::vec3& potentialPos, const std::vector<Scen
     for (const auto& mat : treeMatrices) {
         // mat[3] to czwarta kolumna macierzy (translacja)
         glm::vec3 treePos = glm::vec3(mat[3]); 
-        CSphereCollider treeCollider(treePos, 0.4f); 
+        CSphereCollider treeCollider(treePos, 0.4f, ColliderType::WALL);
         
         if (treeCollider.isCollision(&playerTest)) {
             return true;
         }
     }
 
-    return false;
+    return movementBlocked;
 }
 
 // 2. Obsługa wejścia
