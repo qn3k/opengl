@@ -1,12 +1,13 @@
 #include "PlayerLogic.hpp"
 #include <cmath>
 #include <algorithm>
+#include <iostream>
 
 extern float GetHeight(float x, float z);
-extern std::vector<glm::mat4> treeMatrices;
+extern void resetGame(std::vector<CMesh>& meshes);
 
 // 1. Logika fizyki 
-bool checkGlobalCollisions(const glm::vec3& potentialPos, std::vector<SceneObject>& scene, const PlayerIndices& pIdx) {
+bool checkGlobalCollisions(const glm::vec3& potentialPos, std::vector<SceneObject>& scene, const PlayerIndices& pIdx, std::vector<CMesh>& meshes) {
     glm::vec3 testPos = potentialPos;
     testPos.y += 0.5f;
     CSphereCollider playerTest(testPos, 0.5f, ColliderType::WALL);
@@ -32,9 +33,9 @@ bool checkGlobalCollisions(const glm::vec3& potentialPos, std::vector<SceneObjec
                         break;
 
                     case ColliderType::COLLECTIBLE:
-                        // Jeśli to moneta, "usuń" ją ze świata
+                        resetGame(meshes);
                         scene[i].isCollected = true;
-                        printf("Zebrałeś przedmiot!\n");
+                        printf("WYGRANA! Zebrano kolibra.\n");
                         // Przedmiot nie blokuje ruchu
                         break;
 
@@ -46,18 +47,24 @@ bool checkGlobalCollisions(const glm::vec3& potentialPos, std::vector<SceneObjec
         }
     }
 
-    // --- B. ŚCIANY LABIRYNTU (Globalny wektor activeColliders) ---
-    // To tutaj są przechowywane collidery dodane w analyzeMaze
-    extern std::vector<CAABBCollider> activeColliders; // Deklaracja wektora z collider.hpp
+    // --- B. ŚCIANY I KOLIBER ---
+    extern std::vector<CAABBCollider> activeColliders;
+    extern glm::vec3 koliberPos; 
+
     for (auto& wall : activeColliders) {
         if (wall.isCollision(&playerTest)) {
+            
+            // SPRAWDZANIE KOLIBRA:
+            // Jeśli collider jest blisko pozycji kolibra, to jest to nasz cel
+            if (glm::distance(wall.Position, koliberPos) < 0.5f) {
+                resetGame(meshes); // Teraz 'meshes' jest widoczne dzięki argumentowi funkcji
+                return false; // Zwracamy false, żeby nie blokować ruchu w klatce resetu
+            }
+
+            // SPRAWDZANIE ŚCIAN:
             if (wall.Type == ColliderType::WALL) {
                 movementBlocked = true;
             }
-            else if (wall.Type == ColliderType::TRIGGER) {
-            printf("WYGRANA! Dotarłeś do wyjścia!\n");
-            // Tutaj możesz np. zmienić zmienną stanu gry: gameState = WON;
-             }
         }
     }
 
@@ -66,7 +73,7 @@ bool checkGlobalCollisions(const glm::vec3& potentialPos, std::vector<SceneObjec
 
 // 2. Obsługa wejścia
 void handleInput(bool* keys, CPlayer& myPlayer, std::vector<SceneObject>& scene, 
-                 const std::vector<CMesh>& meshes, const PlayerIndices& pIdx, 
+                 std::vector<CMesh>& meshes, const PlayerIndices& pIdx, 
                  int playerIdx, float playerRadius) {
                  
     float speed = 0.08f;
@@ -104,7 +111,7 @@ void handleInput(bool* keys, CPlayer& myPlayer, std::vector<SceneObject>& scene,
             glm::vec3 collisionTestPos = nextPos;
             collisionTestPos.y = terrainHeight + 1.0f; // Podnieś punkt testowy o 1 metr
 
-            if (!checkGlobalCollisions(collisionTestPos, scene, pIdx)) {
+            if (!checkGlobalCollisions(collisionTestPos, scene, pIdx, meshes)) {
                 myPlayer.position = nextPos; // Przypisz oryginalną pozycję (stopy na ziemi)
                 myPlayer.position.y = terrainHeight;
             }

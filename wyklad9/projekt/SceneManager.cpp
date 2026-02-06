@@ -4,19 +4,14 @@
 #include <stdio.h>
 #include <glm/gtc/matrix_transform.hpp>
 
-std::vector<glm::mat4> flowerMatrices;
-std::vector<glm::vec3> flowerColors;
-const int FLOWER_COUNT = 500;
-std::vector<glm::mat4> treeMatrices;
-std::vector<glm::vec3> treeColors;
-const int TREE_COUNT = 250;
-//wysokosci do kwiatow
+//wysokosci
 std::vector<float> globalHeights;
 int hmWidth = 256;
 int hmHeight = 256;
 float hmYScale = 0.2f;
 float hmXZScale = 1.0f;
 PlayerIndices pIdx;
+extern glm::vec3 koliberPos;
 
 //obliczanie wysokosci do kwiatow z renderingu instancyjnego
 
@@ -215,7 +210,7 @@ GLuint LoadCubemap(std::vector<std::string> faces) {
 }
 
 void InitializeResources(std::vector<CMesh>& meshes, std::vector<GLuint>& textures) {
-    CMesh mGround, playerObj,playerBody, playerLegR, playerLegL, mWall_1,mWall_2;
+    CMesh mGround, playerObj,playerBody, playerLegR, playerLegL, mWall_1,koliber;
     mGround.Load("obj/scene-plane.obj"); 
     //mGround.Load("obj/cube.obj");
     playerObj.Load("obj/lego.obj"); 
@@ -223,7 +218,7 @@ void InitializeResources(std::vector<CMesh>& meshes, std::vector<GLuint>& textur
     playerLegR.Load("obj/noga_prawa.obj"); 
     playerLegL.Load("obj/noga_lewa.obj");
     mWall_1.Load("obj/wall_1.obj");
-    mWall_2.Load("obj/wall_2.obj");
+    koliber.Load("obj/koliber.obj");
 
     meshes.push_back(mGround); // 0
     meshes.push_back(playerObj); //1
@@ -231,7 +226,7 @@ void InitializeResources(std::vector<CMesh>& meshes, std::vector<GLuint>& textur
     meshes.push_back(playerLegR); //3
     meshes.push_back(playerLegL); //4
     meshes.push_back(mWall_1); //5
-    meshes.push_back(mWall_2); //6
+    meshes.push_back(koliber); //6
 
     //gdzie jest ziemia
     groundMeshPtr = &meshes[0];
@@ -366,6 +361,18 @@ void BuildScene(std::vector<SceneObject>& scene, std::vector<CMesh>& meshes, std
     wall_2.idNormalMap = textures[7]; //normalmapa lisci
     scene.push_back(wall_2);
     */
+
+    // --- OBIEKT 6: KOLIBER ---
+    SceneObject koliber;
+    koliber.mesh = &meshes[6]; 
+    koliber.position = koliberPos;
+    koliber.rotation = glm::vec3(0.0f, 1.57f, 0.0f);
+    koliber.scale = glm::vec3(2.0f); 
+    koliber.color = glm::vec3(0.1f, 0.5f, 0.4f); 
+    koliber.idTexture = 0;
+    koliber.mat = {0.2f, 0.8f, 1.0f, 128.0f};
+    koliber.collider = new CSphereCollider(koliber.position, 1.5f, ColliderType::COLLECTIBLE); 
+    scene.push_back(koliber);
 }
 
 void LoadHeightmap(const char* filename, std::vector<TerrainVertex>& vertices, std::vector<unsigned int>& indices) {
@@ -509,5 +516,5 @@ glm::vec3 CMesh::calculateHalfSizes() {
         maxV = glm::max(maxV, v);
     }
     // Połowa różnicy między max a min to nasze HalfSizes
-    return (maxV - minV) * 0.5f;
+    return (maxV - minV) * 1.0f;
 }

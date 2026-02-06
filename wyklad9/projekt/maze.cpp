@@ -20,6 +20,8 @@ int maze[SIZE][SIZE];
 // Zmienne globalne do instancjonowania
 std::vector<glm::mat4> matrices[16]; 
 std::vector<CAABBCollider> activeColliders;
+glm::vec3 koliberPos; 
+bool hasWon = false;
 
 // --- FUNKCJA GENERUJĄCA LOGIKĘ LABIRYNTU ---
 void generateMaze() {
@@ -59,24 +61,21 @@ void generateMaze() {
 void analyzeMaze(std::vector<CMesh>& meshes, float scale) {
     // Czyścimy kontenery przed budową
     for(int i = 0; i < 16; i++) matrices[i].clear();
-    
-    // activeColliders jest zdefiniowane w collider.hpp, czyścimy je:
     activeColliders.clear();
 
     for (int y = 0; y < SIZE; y++) {
         for (int x = 0; x < SIZE; x++) {
             // --- LOGIKA WYJŚCIA (2) ---
             if (maze[y][x] == 2) {
-                glm::vec3 exitPos = glm::vec3(x * scale, 0.0f, y * scale);
-                // Dodajemy TRIGGER (nie blokuje ruchu, ale go wykrywamy)
-                // Ustawiamy wysokość na 1.0f i rozmiar pudła na scale
-                // addTriggerCollider(exitPos + glm::vec3(0, 1.0f, 0), glm::vec3(scale/2.0f, 2.0f, scale/2.0f));
+                koliberPos.x = (float)x * scale;
+                koliberPos.y = 0.5f; // Obniżona wysokość
+                koliberPos.z = (float)y * scale;
                 
-                // Opcjonalnie: możesz tu dodać macierz do matrices[X] 
-                // jeśli masz model schodów lub bramy wyjściowej
+                // Dodajemy collider, który będziemy sprawdzać w pętli ruchu
+                // Używamy addWallCollider, bo go już masz w systemie
+                addWallCollider(koliberPos, glm::vec3(0.4f, 0.4f, 0.4f));
                 continue; 
             }
-
             if (maze[y][x] != 1) continue;
 
             glm::vec3 center = glm::vec3(x * scale, 0.0f, y * scale);
@@ -87,8 +86,8 @@ void analyzeMaze(std::vector<CMesh>& meshes, float scale) {
             bool r = (x < SIZE - 1) && (maze[y][x + 1] == 1);
 
             // 1. Środek (Słupek)
-            glm::vec3 pillarHalf = meshes[6].calculateHalfSizes();
-            // UWAGA: Wywołujemy addWallCollider z collider.hpp (bez 'new'!)
+            glm::vec3 pillarHalf = meshes[5].calculateHalfSizes();
+            //Wywołujemy addWallCollider z collider.hpp (
             addWallCollider(center + glm::vec3(0, 1.0f, 0), pillarHalf * 1.0f);
 
             // 2. Ramiona (Ściany łączące)
@@ -98,7 +97,7 @@ void analyzeMaze(std::vector<CMesh>& meshes, float scale) {
             auto addArm = [&](glm::vec3 posOffset, float angleY, bool horizontal) {
                 glm::mat4 m = glm::translate(glm::mat4(1.0f), center + posOffset);
                 m = glm::rotate(m, glm::radians(angleY), glm::vec3(0, 1, 0));
-                m = glm::scale(m, glm::vec3(1.0f, 3.0f, 1.0f));
+                m = glm::scale(m, glm::vec3(1.0f, 1.0f, 1.0f)); //wysokosc scian
                 matrices[5].push_back(m);
 
                 // Pełne wymiary: długość ramienia, wysokość (6.0), grubość (0.4)
@@ -132,4 +131,11 @@ void analyzeMaze(std::vector<CMesh>& meshes, float scale) {
 // Funkcja spinająca, którą wywołasz raz po wczytaniu modeli
 void setupMazeInstancing(std::vector<CMesh>& meshes) {
     analyzeMaze(meshes, 2.0f);
+}
+
+void resetGame(std::vector<CMesh>& meshes) {
+    hasWon = false;
+    generateMaze();               // Nowa logika
+    analyzeMaze(meshes, 2.0f);    // Nowa geometria i collidery
+
 }

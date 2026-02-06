@@ -52,9 +52,9 @@ bool useShadows = true; // Flaga kontrolna
 bool canMove = true;
 bool playerArrow = true;
 float playerRadius = 0.5f;
-extern std::vector<glm::mat4> treeMatrices;
 extern std::vector<glm::mat4> matrices[16];
 float normalStrength = 1.0f;
+extern glm::vec3 koliberPos;
 
 // --- STRUKTURA ŚWIATŁA ---
 struct PointLight {
@@ -125,6 +125,27 @@ void setupFBO() {
     glBindFramebuffer(GL_FRAMEBUFFER, 0); // Wracamy do domyślnego bufora
 }
 
+void animateHummingbird(GLuint idProgram, std::vector<CMesh>& meshes) {
+    float t = (float)glfwGetTime();
+    
+    // 1. Obliczamy macierz animacji
+    glm::mat4 m = glm::translate(glm::mat4(1.0f), koliberPos + glm::vec3(0.0f, sin(t * 1.0f) * 0.1f, 0.0f));
+    m = glm::rotate(m, t * 2.0f, glm::vec3(0.0f, 1.0f, 0.0f));
+    m = glm::scale(m, glm::vec3(1.0f));
+
+    // 2. Przesyłamy tylko macierz modelu do shadera
+    glUseProgram(idProgram);
+    glUniformMatrix4fv(glGetUniformLocation(idProgram, "model"), 1, GL_FALSE, glm::value_ptr(m));
+    glUniform1i(glGetUniformLocation(idProgram, "uUseEnvMap"), 1);
+    glUniform1f(glGetUniformLocation(idProgram, "reflectionFactor"), 0.8f);
+
+    // 3. Rysujemy mesh nr 6
+    meshes[6].Draw();
+
+    //reser env map
+    glUniform1i(glGetUniformLocation(idProgram, "uUseEnvMap"), 0);
+}
+
 void DrawWorld(glm::mat4 projection, glm::mat4 view, glm::vec3 camPos) {
    
     glm::mat4 viewStatic = glm::mat4(glm::mat3(view)); // Usuwamy translację
@@ -188,12 +209,12 @@ void DrawWorld(glm::mat4 projection, glm::mat4 view, glm::vec3 camPos) {
     glUniform1i(glGetUniformLocation(idProgram, "bIsInstanced"), 1);
     //sciany
     glUniform1i(loc_bUseTexture, 1); 
-    glUniform1f(locTiling, 8.0f); 
+    glUniform1f(locTiling, 4.0f); 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, textures[6]);
     glUniform1i(glGetUniformLocation(idProgram, "uTextureSampler"), 0);
     if (!matrices[5].empty()) {
-        meshes[5].DrawInstanced(matrices[5].size()); // Musisz mieć taką metodę w CMesh!
+        meshes[5].DrawInstanced(matrices[5].size()); 
     }
     glUniform1i(glGetUniformLocation(idProgram, "bIsInstanced"), 0);
 
@@ -203,6 +224,8 @@ void DrawWorld(glm::mat4 projection, glm::mat4 view, glm::vec3 camPos) {
     // shaddow mapping
     glUniformMatrix4fv(glGetUniformLocation(idProgram, "lightProj"), 1, GL_FALSE, glm::value_ptr(lightProj));
     glUniformMatrix4fv(glGetUniformLocation(idProgram, "lightView"), 1, GL_FALSE, glm::value_ptr(lightView));
+
+    animateHummingbird(idProgram, meshes);
 
     // Przekazujemy teksturę cienia na SLOT 2 (Slot 0 - tekstura obiektu, Slot 1 - Skybox)
     glActiveTexture(GL_TEXTURE2);
@@ -258,14 +281,14 @@ void DrawWorld(glm::mat4 projection, glm::mat4 view, glm::vec3 camPos) {
     
         /*
         // Env mapping (Koliber)
-        if (obj.mesh == &meshes[5]) {
+        if (obj.mesh == &meshes[6]) {
             glUniform1i(glGetUniformLocation(idProgram, "uUseEnvMap"), 1);
             glUniform1f(glGetUniformLocation(idProgram, "reflectionFactor"), 0.8f);
         } else {
             glUniform1i(glGetUniformLocation(idProgram, "uUseEnvMap"), 0);
         }
         */
-
+        
         // Gdzieś w pętli rysowania, przed narysowaniem prostopadłościanu:
         int strengthLoc = glGetUniformLocation(idProgram, "uNormalStrength");
         glUniform1f(strengthLoc, normalStrength); 
@@ -284,6 +307,37 @@ void DrawWorld(glm::mat4 projection, glm::mat4 view, glm::vec3 camPos) {
             //meshes[2].Draw();
         }
         glUniform1i(glGetUniformLocation(idProgram, "bIsLightSource"), false);
+    }
+
+    // projekt.cpp -> wewnątrz funkcji DisplayScene lub Update
+    for (auto& obj : scene) {
+        if (obj.mesh == &meshes[6]) { // Sprawdzamy, czy to koliber
+            
+            // 1. Aktualizacja pozycji (żeby kolizja "chodziła" za modelem)
+            obj.position = koliberPos;
+            if (obj.collider) {
+                CSphereCollider* sphere = (CSphereCollider*)obj.collider;
+                sphere->Position = koliberPos;
+
+                // 2. SPRAWDZENIE KOLIZJI Z GRACZEM
+                // Zakładam, że masz dostęp do myPlayer i jego collidera
+                if (myPlayer.collider->isCollision(obj.collider)) {
+                    
+                    printf("KOLIBER ZEBRANY! Resetowanie labiryntu...\n");
+
+                    // Teleport gracza na początek
+                    myPlayer.position = glm::vec3(2.0f, 1.0f, 2.0f);
+                    
+                    // Regeneracja labiryntu
+                    generateMaze(); 
+                    setupMazeInstancing(meshes); 
+                    
+                    // Ważne: po resetowaniu warto przerwać pętlę, 
+                    // bo obiekty w scenie mogły się zmienić
+                    break; 
+                }
+            }
+        }
     }
 
 }
@@ -416,6 +470,9 @@ void Initialize() {
     //labirynt
     generateMaze();
     setupMazeInstancing(meshes);    
+
+    // Ustawiamy go w przeciwległym rogu (prawy dół)
+    koliberPos = glm::vec3(38.0f, 0.5f, 38.0f);
 
     // Konfiguracja Skyboxa
     std::vector<std::string> faces1 = {"skybox1/posx.jpg","skybox1/negx.jpg","skybox1/posy.jpg","skybox1/negy.jpg","skybox1/posz.jpg","skybox1/negz.jpg"};

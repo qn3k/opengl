@@ -13,9 +13,9 @@ void handleInput(
     bool* keys, 
     CPlayer& myPlayer, 
     std::vector<SceneObject>& scene, 
-    const std::vector<CMesh>& meshes,
-    const PlayerIndices& pIdx,
-    int playerIdx,
+    std::vector<CMesh>& meshes, // USUNIĘTO 'const'
+    const PlayerIndices& pIdx, 
+    int playerIdx, 
     float playerRadius
 );
 
