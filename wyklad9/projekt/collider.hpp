@@ -99,7 +99,7 @@ public:
     inline glm::vec3 get_max() const { return Position + HalfSizes; }
 };
 
-inline std::vector<CAABBCollider> activeColliders;
+extern std::vector<CAABBCollider> activeColliders;
 
 inline void addWallCollider(glm::vec3 pos, glm::vec3 size) {
     activeColliders.push_back(CAABBCollider(pos, size / 2.0f)); 

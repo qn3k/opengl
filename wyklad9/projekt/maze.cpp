@@ -19,6 +19,7 @@ int maze[SIZE][SIZE];
 
 // Zmienne globalne do instancjonowania
 std::vector<glm::mat4> matrices[16]; 
+std::vector<CAABBCollider> activeColliders;
 
 // --- FUNKCJA GENERUJĄCA LOGIKĘ LABIRYNTU ---
 void generateMaze() {
@@ -88,7 +89,7 @@ void analyzeMaze(std::vector<CMesh>& meshes, float scale) {
             // 1. Środek (Słupek)
             glm::vec3 pillarHalf = meshes[6].calculateHalfSizes();
             // UWAGA: Wywołujemy addWallCollider z collider.hpp (bez 'new'!)
-            addWallCollider(center + glm::vec3(0, 1.0f, 0), pillarHalf * 2.0f);
+            addWallCollider(center + glm::vec3(0, 1.0f, 0), pillarHalf * 1.0f);
 
             // 2. Ramiona (Ściany łączące)
             float armLen = scale / 2.0f;
@@ -97,10 +98,21 @@ void analyzeMaze(std::vector<CMesh>& meshes, float scale) {
             auto addArm = [&](glm::vec3 posOffset, float angleY, bool horizontal) {
                 glm::mat4 m = glm::translate(glm::mat4(1.0f), center + posOffset);
                 m = glm::rotate(m, glm::radians(angleY), glm::vec3(0, 1, 0));
-                matrices[5].push_back(m); // Zapisujemy do instancjonowania wall_1
+                m = glm::scale(m, glm::vec3(1.0f, 3.0f, 1.0f));
+                matrices[5].push_back(m);
 
-                glm::vec3 currentSize = horizontal ? glm::vec3(armLen, 2.0f, 0.4f) : glm::vec3(0.4f, 2.0f, armLen);
-                addWallCollider(center + posOffset + glm::vec3(0, 1.0f, 0), currentSize);
+                // Pełne wymiary: długość ramienia, wysokość (6.0), grubość (0.4)
+                glm::vec3 fullSize(armLen, 6.0f, 0.4f); 
+                
+                glm::vec3 actualFullSize;
+                if (angleY == 90.0f || angleY == -90.0f) {
+                    // Zamiana X z Z dla pełnego wymiaru
+                    actualFullSize = glm::vec3(fullSize.z, fullSize.y, fullSize.x);
+                } else {
+                    actualFullSize = fullSize;
+                }
+
+                addWallCollider(center + posOffset + glm::vec3(0, 3.0f, 0), actualFullSize);
             };
 
             if (u) addArm(glm::vec3(0, 0, -offset), 0.0f, false);

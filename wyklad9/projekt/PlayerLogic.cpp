@@ -7,7 +7,9 @@ extern std::vector<glm::mat4> treeMatrices;
 
 // 1. Logika fizyki 
 bool checkGlobalCollisions(const glm::vec3& potentialPos, std::vector<SceneObject>& scene, const PlayerIndices& pIdx) {
-    CSphereCollider playerTest(potentialPos, 0.5f, ColliderType::WALL); 
+    glm::vec3 testPos = potentialPos;
+    testPos.y += 0.5f;
+    CSphereCollider playerTest(testPos, 0.5f, ColliderType::WALL);
     bool movementBlocked = false;
 
     // A. Obiekty ze sceny
@@ -98,13 +100,13 @@ void handleInput(bool* keys, CPlayer& myPlayer, std::vector<SceneObject>& scene,
 
         // 1. Sprawdzamy wysokość terenu (czy nie wychodzimy poza mapę)
         float terrainHeight = GetHeight(nextPos.x, nextPos.z);
-        
-        if (terrainHeight > -9000.0f) { // Jeśli jesteśmy na mapie
-            nextPos.y = terrainHeight; // Dopasuj wysokość do terenu
+        if (terrainHeight > -9000.0f) {
+            glm::vec3 collisionTestPos = nextPos;
+            collisionTestPos.y = terrainHeight + 1.0f; // Podnieś punkt testowy o 1 metr
 
-            // 2. Sprawdzamy kolizje z obiektami (System Colliderów)
-            if (!checkGlobalCollisions(nextPos, scene, pIdx)) {
-                myPlayer.position = nextPos;
+            if (!checkGlobalCollisions(collisionTestPos, scene, pIdx)) {
+                myPlayer.position = nextPos; // Przypisz oryginalną pozycję (stopy na ziemi)
+                myPlayer.position.y = terrainHeight;
             }
         }
     }

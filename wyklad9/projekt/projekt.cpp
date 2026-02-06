@@ -409,7 +409,9 @@ void Initialize() {
     }
     myGround.Init(); 
     myPlayer.Init(&myGround);
-    myPlayer.position.y = myGround.getY(glm::vec2(myPlayer.position.x, myPlayer.position.z));
+    float scale = 2.0f;
+    myPlayer.position = glm::vec3(1.0f * scale, 0.0f, 1.0f * scale);
+    myPlayer.position.y = GetHeight(myPlayer.position.x, myPlayer.position.z) + 0.0f;
 
     //labirynt
     generateMaze();

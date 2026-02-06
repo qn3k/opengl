@@ -37,7 +37,7 @@ float GetHeight(float x, float z) {
 
     // Definiujemy skale 
     float scaleX = 4.0f;
-    float scaleY = 1.0f;
+    float scaleY = 0.1f;
     float scaleZ = 4.0f;
     /*
     float scaleX = 48.0f;
@@ -265,7 +265,7 @@ void BuildScene(std::vector<SceneObject>& scene, std::vector<CMesh>& meshes, std
     ground.mesh = &meshes[0];
     ground.idTexture = textures[1];
     ground.position = glm::vec3(0.0f, 0.0f, 0.0f); 
-    ground.scale = glm::vec3(4.0f, 1.0f, 4.0f);    //powiekszenie razy 4
+    ground.scale = glm::vec3(4.0f, 0.1f, 4.0f);    //powiekszenie razy 4
     ground.rotation = glm::vec3(0.0f, 0.0f, 0.0f);
     ground.color = glm::vec3(1.0f);
     ground.mat = {0.2f, 0.8f, 0.1f, 32.0f};   // Parametry materiału
