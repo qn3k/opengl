@@ -46,6 +46,7 @@ bool isPointLight = true; // true = Punktowe, false = Kierunkowe
 glm::vec3 dirLightDirection = glm::vec3(-0.2f, -1.0f, -0.3f); // Światło padające z góry pod skosem
 Skybox* skybox1 = nullptr;
 Skybox* skybox2 = nullptr;
+Skybox* skybox3 = nullptr;
 int currentSkybox = 0;
 bool showMinimap = true; // Flaga widoczności minimapy
 bool useShadows = true; // Flaga kontrolna
@@ -154,7 +155,8 @@ void DrawWorld(glm::mat4 projection, glm::mat4 view, glm::vec3 camPos) {
 
     glActiveTexture(GL_TEXTURE1);
     if (currentSkybox == 0) glBindTexture(GL_TEXTURE_CUBE_MAP, skybox1->getTextureID());
-    else glBindTexture(GL_TEXTURE_CUBE_MAP, skybox2->getTextureID());
+    else if (currentSkybox == 1) { glBindTexture(GL_TEXTURE_CUBE_MAP, skybox2->getTextureID());}
+    else { glBindTexture(GL_TEXTURE_CUBE_MAP, skybox3->getTextureID());}
     glUniform1i(glGetUniformLocation(idProgram, "tex_skybox"), 1);
 
     glDepthFunc(GL_LEQUAL);
@@ -165,6 +167,9 @@ void DrawWorld(glm::mat4 projection, glm::mat4 view, glm::vec3 camPos) {
     } 
     else if (currentSkybox == 1 && skybox2) {
         skybox2->draw(projection, viewStatic, 100.0f);
+    }
+    else if (currentSkybox == 2 && skybox3) {
+        skybox3->draw(projection, viewStatic, 100.0f);
     }
 
     glDepthMask(GL_TRUE);
@@ -477,9 +482,11 @@ void Initialize() {
     // Konfiguracja Skyboxa
     std::vector<std::string> faces1 = {"skybox1/posx.jpg","skybox1/negx.jpg","skybox1/posy.jpg","skybox1/negy.jpg","skybox1/posz.jpg","skybox1/negz.jpg"};
     std::vector<std::string> faces2 = {"skybox2/posx.jpg","skybox2/negx.jpg","skybox2/posy.jpg","skybox2/negy.jpg","skybox2/posz.jpg","skybox2/negz.jpg"};
+    std::vector<std::string> faces3 = {"skybox3/posx.jpg","skybox3/negx.jpg","skybox3/posy.jpg","skybox3/negy.jpg","skybox3/posz.jpg","skybox3/negz.jpg"};
 
     skybox1 = new Skybox(faces1, "shaders/skybox-vertex.glsl", "shaders/skybox-fragment.glsl");
     skybox2 = new Skybox(faces2, "shaders/skybox-vertex.glsl", "shaders/skybox-fragment.glsl");
+    skybox3 = new Skybox(faces3, "shaders/skybox-vertex.glsl", "shaders/skybox-fragment.glsl");
     
     matProj = glm::perspective(glm::radians(80.0f), windowWidth/(float)windowHeight, 0.1f, 500.0f);
 
@@ -618,6 +625,7 @@ void DisplayScene() {
     ImGui::Text("\nWybierz Skybox:");
     ImGui::RadioButton("Jeden", &currentSkybox, 0);
     ImGui::RadioButton("Dwa", &currentSkybox, 1);
+    ImGui::RadioButton("Dwa", &currentSkybox, 2);
 
     ImGui::Begin("Ustawienia Materialu");
     ImGui::SliderFloat("Sila Normal Mapy", &normalStrength, 0.0f, 5.0f); // Zakres od 0 (płaskie) do 5 (bardzo wypukłe)
@@ -684,6 +692,7 @@ int main() {
     for(auto& m : meshes) m.Release();
     delete skybox1;
     delete skybox2;
+    delete skybox3;
     for (auto& obj : scene) {
     if (obj.collider != nullptr) {
         delete obj.collider;
