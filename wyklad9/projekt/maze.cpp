@@ -67,13 +67,8 @@ void analyzeMaze(std::vector<CMesh>& meshes, float scale) {
         for (int x = 0; x < SIZE; x++) {
             // --- LOGIKA WYJŚCIA (2) ---
             if (maze[y][x] == 2) {
-                koliberPos.x = (float)x * scale;
-                koliberPos.y = 0.5f; // Obniżona wysokość
-                koliberPos.z = (float)y * scale;
-                
-                // Dodajemy collider, który będziemy sprawdzać w pętli ruchu
-                // Używamy addWallCollider, bo go już masz w systemie
-                addWallCollider(koliberPos, glm::vec3(0.4f, 0.4f, 0.4f));
+                koliberPos = glm::vec3((float)x * scale, 0.5f, (float)y * scale);
+                addWallCollider(koliberPos + glm::vec3(0, 0.5f, 0), glm::vec3(0.8f, 0.8f, 0.8f));
                 continue; 
             }
             if (maze[y][x] != 1) continue;
@@ -97,7 +92,7 @@ void analyzeMaze(std::vector<CMesh>& meshes, float scale) {
             auto addArm = [&](glm::vec3 posOffset, float angleY, bool horizontal) {
                 glm::mat4 m = glm::translate(glm::mat4(1.0f), center + posOffset);
                 m = glm::rotate(m, glm::radians(angleY), glm::vec3(0, 1, 0));
-                m = glm::scale(m, glm::vec3(1.0f, 1.0f, 1.0f)); //wysokosc scian
+                m = glm::scale(m, glm::vec3(1.0f, 3.0f, 1.0f)); //wysokosc scian
                 matrices[5].push_back(m);
 
                 // Pełne wymiary: długość ramienia, wysokość (6.0), grubość (0.4)

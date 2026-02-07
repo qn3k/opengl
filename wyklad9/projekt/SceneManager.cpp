@@ -361,18 +361,6 @@ void BuildScene(std::vector<SceneObject>& scene, std::vector<CMesh>& meshes, std
     wall_2.idNormalMap = textures[7]; //normalmapa lisci
     scene.push_back(wall_2);
     */
-
-    // --- OBIEKT 6: KOLIBER ---
-    SceneObject koliber;
-    koliber.mesh = &meshes[6]; 
-    koliber.position = koliberPos;
-    koliber.rotation = glm::vec3(0.0f, 1.57f, 0.0f);
-    koliber.scale = glm::vec3(2.0f); 
-    koliber.color = glm::vec3(0.1f, 0.5f, 0.4f); 
-    koliber.idTexture = 0;
-    koliber.mat = {0.2f, 0.8f, 1.0f, 128.0f};
-    koliber.collider = new CSphereCollider(koliber.position, 1.5f, ColliderType::COLLECTIBLE); 
-    scene.push_back(koliber);
 }
 
 void LoadHeightmap(const char* filename, std::vector<TerrainVertex>& vertices, std::vector<unsigned int>& indices) {

@@ -54,7 +54,7 @@ bool canMove = true;
 bool playerArrow = true;
 float playerRadius = 0.5f;
 extern std::vector<glm::mat4> matrices[16];
-float normalStrength = 1.0f;
+float normalStrength = 4.0f;
 extern glm::vec3 koliberPos;
 
 // --- STRUKTURA ŚWIATŁA ---
@@ -128,15 +128,27 @@ void setupFBO() {
 
 void animateHummingbird(GLuint idProgram, std::vector<CMesh>& meshes) {
     float t = (float)glfwGetTime();
-    
+    float angle = (float)glfwGetTime() * 2.0f; // Szybkość obrotu
+
+    glm::mat4 m = glm::mat4(1.0f);
     // 1. Obliczamy macierz animacji
-    glm::mat4 m = glm::translate(glm::mat4(1.0f), koliberPos + glm::vec3(0.0f, sin(t * 1.0f) * 0.1f, 0.0f));
-    m = glm::rotate(m, t * 2.0f, glm::vec3(0.0f, 1.0f, 0.0f));
-    m = glm::scale(m, glm::vec3(1.0f));
+    m = glm::translate(glm::mat4(1.0f), koliberPos + glm::vec3(0.0f, sin(t * 1.0f) * 0.1f, 0.0f));
+    m = glm::rotate(m, angle, glm::vec3(0.0f, 1.0f, 0.0f));
+    m = glm::scale(m, glm::vec3(0.7f)); //wielkosc kolibra
+
+    glUniformMatrix4fv(glGetUniformLocation(idProgram, "matModel"), 1, GL_FALSE, glm::value_ptr(m));
 
     // 2. Przesyłamy tylko macierz modelu do shadera
     glUseProgram(idProgram);
-    glUniformMatrix4fv(glGetUniformLocation(idProgram, "model"), 1, GL_FALSE, glm::value_ptr(m));
+    //skybox do odbijania
+    glActiveTexture(GL_TEXTURE1); 
+    GLuint texID = 0;
+    if (currentSkybox == 0) texID = skybox1->getTextureID();
+    else if (currentSkybox == 1) texID = skybox2->getTextureID();
+    else texID = skybox3->getTextureID();
+    glBindTexture(GL_TEXTURE_CUBE_MAP, texID); // Ważne: glBindTexture!
+    glUniform1i(glGetUniformLocation(idProgram, "tex_skybox"), 1);
+
     glUniform1i(glGetUniformLocation(idProgram, "uUseEnvMap"), 1);
     glUniform1f(glGetUniformLocation(idProgram, "reflectionFactor"), 0.8f);
 
@@ -154,9 +166,10 @@ void DrawWorld(glm::mat4 projection, glm::mat4 view, glm::vec3 camPos) {
     //glUseProgram(idProgram);
 
     glActiveTexture(GL_TEXTURE1);
-    if (currentSkybox == 0) glBindTexture(GL_TEXTURE_CUBE_MAP, skybox1->getTextureID());
-    else if (currentSkybox == 1) { glBindTexture(GL_TEXTURE_CUBE_MAP, skybox2->getTextureID());}
-    else { glBindTexture(GL_TEXTURE_CUBE_MAP, skybox3->getTextureID());}
+    GLuint texID = 0;
+    if (currentSkybox == 0) texID = skybox1->getTextureID();
+    else if (currentSkybox == 1) texID = skybox2->getTextureID();
+    else texID = skybox3->getTextureID();
     glUniform1i(glGetUniformLocation(idProgram, "tex_skybox"), 1);
 
     glDepthFunc(GL_LEQUAL);
@@ -177,9 +190,11 @@ void DrawWorld(glm::mat4 projection, glm::mat4 view, glm::vec3 camPos) {
 
     glUseProgram(idProgram);
     
-    // Pobieramy lokalizacje zmiennych, których wcześniej brakowało
+    // zmienne
     GLint loc_bUseTexture = glGetUniformLocation(idProgram, "bUseTexture");
     GLint locTiling = glGetUniformLocation(idProgram, "uTiling");
+    GLint loc_uNormalMap = glGetUniformLocation(idProgram, "uNormalMap");
+    GLint loc_uUseNormalMap = glGetUniformLocation(idProgram, "uUseNormalMap");
 
     // Przesyłanie macierzy - używamy nazw z argumentów funkcji (projection, view, camPos)
     glUniformMatrix4fv(glGetUniformLocation(idProgram, "matProj"), 1, GL_FALSE, glm::value_ptr(projection));
@@ -201,7 +216,7 @@ void DrawWorld(glm::mat4 projection, glm::mat4 view, glm::vec3 camPos) {
     glUniform3fv(glGetUniformLocation(idProgram, "dirLightDirection"), 1, glm::value_ptr(dirLightDirection));
     glUniform1i(glGetUniformLocation(idProgram, "isPointLight"), isPointLight);
     glUniform1i(glGetUniformLocation(idProgram, "activeLightsCount"), activeLightsCount);
-
+    
     for (int i = 0; i < 4; i++) {
         std::string base = "lights[" + std::to_string(i) + "]";
         if(i == 0) lights[i].color = lightColor; 
@@ -218,31 +233,35 @@ void DrawWorld(glm::mat4 projection, glm::mat4 view, glm::vec3 camPos) {
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, textures[6]);
     glUniform1i(glGetUniformLocation(idProgram, "uTextureSampler"), 0);
+    //normallmap
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_2D, textures[7]);
+    glUniform1i(loc_uNormalMap, 3);
+    glUniform1i(loc_uUseNormalMap, 1);
+
     if (!matrices[5].empty()) {
         meshes[5].DrawInstanced(matrices[5].size()); 
     }
+    glActiveTexture(GL_TEXTURE0);
     glUniform1i(glGetUniformLocation(idProgram, "bIsInstanced"), 0);
 
     //powrot do normalnych obiektow
+     glUniform1i(loc_uUseNormalMap, 0);
     glUniform1i(loc_bUseTexture, 1);
 
     // shaddow mapping
     glUniformMatrix4fv(glGetUniformLocation(idProgram, "lightProj"), 1, GL_FALSE, glm::value_ptr(lightProj));
     glUniformMatrix4fv(glGetUniformLocation(idProgram, "lightView"), 1, GL_FALSE, glm::value_ptr(lightView));
 
-    animateHummingbird(idProgram, meshes);
-
     // Przekazujemy teksturę cienia na SLOT 2 (Slot 0 - tekstura obiektu, Slot 1 - Skybox)
     glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_2D, DepthMap_idTexture);
     glUniform1i(glGetUniformLocation(idProgram, "tex_shadowMap"), 2);
 
-    GLint loc_uNormalMap = glGetUniformLocation(idProgram, "uNormalMap");
-    GLint loc_uUseNormalMap = glGetUniformLocation(idProgram, "uUseNormalMap");
-
     // --- OBIEKTY SCENY ---
     for (const auto& obj : scene) {
         if (obj.isCollected) continue;
+        if (obj.mesh == &meshes[6]) continue;
         glm::mat4 matModel = glm::mat4(1.0);
         matModel = glm::translate(matModel, obj.position);
         matModel = glm::rotate(matModel, obj.rotation.y, glm::vec3(0, 1, 0));  
@@ -283,16 +302,6 @@ void DrawWorld(glm::mat4 projection, glm::mat4 view, glm::vec3 camPos) {
         if (obj.mesh == &meshes[0]) glUniform1f(locTiling, 8.0f); 
         else if (obj.mesh == &meshes[12]) glUniform1f(locTiling, 2.0f);
         else glUniform1f(locTiling, 1.0f);
-    
-        /*
-        // Env mapping (Koliber)
-        if (obj.mesh == &meshes[6]) {
-            glUniform1i(glGetUniformLocation(idProgram, "uUseEnvMap"), 1);
-            glUniform1f(glGetUniformLocation(idProgram, "reflectionFactor"), 0.8f);
-        } else {
-            glUniform1i(glGetUniformLocation(idProgram, "uUseEnvMap"), 0);
-        }
-        */
         
         // Gdzieś w pętli rysowania, przed narysowaniem prostopadłościanu:
         int strengthLoc = glGetUniformLocation(idProgram, "uNormalStrength");
@@ -300,6 +309,10 @@ void DrawWorld(glm::mat4 projection, glm::mat4 view, glm::vec3 camPos) {
 
         obj.mesh->Draw();
     }
+
+    animateHummingbird(idProgram, meshes);
+    
+    //glUniform1i(glGetUniformLocation(idProgram, "bIsLightSource"), false);
     
     // --- ŻARÓWKI ---
     if (showLightSource && isPointLight) {
@@ -313,38 +326,16 @@ void DrawWorld(glm::mat4 projection, glm::mat4 view, glm::vec3 camPos) {
         }
         glUniform1i(glGetUniformLocation(idProgram, "bIsLightSource"), false);
     }
-
-    // projekt.cpp -> wewnątrz funkcji DisplayScene lub Update
+    
     for (auto& obj : scene) {
-        if (obj.mesh == &meshes[6]) { // Sprawdzamy, czy to koliber
-            
-            // 1. Aktualizacja pozycji (żeby kolizja "chodziła" za modelem)
+        if (obj.mesh == &meshes[6]) { // Sprawdzamy czy to koliber
             obj.position = koliberPos;
             if (obj.collider) {
-                CSphereCollider* sphere = (CSphereCollider*)obj.collider;
-                sphere->Position = koliberPos;
-
-                // 2. SPRAWDZENIE KOLIZJI Z GRACZEM
-                // Zakładam, że masz dostęp do myPlayer i jego collidera
-                if (myPlayer.collider->isCollision(obj.collider)) {
-                    
-                    printf("KOLIBER ZEBRANY! Resetowanie labiryntu...\n");
-
-                    // Teleport gracza na początek
-                    myPlayer.position = glm::vec3(2.0f, 1.0f, 2.0f);
-                    
-                    // Regeneracja labiryntu
-                    generateMaze(); 
-                    setupMazeInstancing(meshes); 
-                    
-                    // Ważne: po resetowaniu warto przerwać pętlę, 
-                    // bo obiekty w scenie mogły się zmienić
-                    break; 
-                }
+                CSphereCollider* sphere = static_cast<CSphereCollider*>(obj.collider);
+                sphere->Position = koliberPos; 
             }
         }
     }
-
 }
 
 void DrawWorldForShadows() {
@@ -354,7 +345,7 @@ void DrawWorldForShadows() {
     glUniformMatrix4fv(glGetUniformLocation(DepthMap_idProgram, "matProj"), 1, GL_FALSE, glm::value_ptr(lightProj));
     glUniformMatrix4fv(glGetUniformLocation(DepthMap_idProgram, "matView"), 1, GL_FALSE, glm::value_ptr(lightView));
 
-    //kwiaty i drzewa
+    //sciany
     GLint locInstanced = glGetUniformLocation(DepthMap_idProgram, "bIsInstanced");
     glUniform1i(locInstanced, 1);
     meshes[5].Draw(); 
@@ -488,7 +479,7 @@ void Initialize() {
     skybox2 = new Skybox(faces2, "shaders/skybox-vertex.glsl", "shaders/skybox-fragment.glsl");
     skybox3 = new Skybox(faces3, "shaders/skybox-vertex.glsl", "shaders/skybox-fragment.glsl");
     
-    matProj = glm::perspective(glm::radians(80.0f), windowWidth/(float)windowHeight, 0.1f, 500.0f);
+    matProj = glm::perspective(glm::radians(80.0f), windowWidth/(float)windowHeight, 0.1f, 200.0f);
 
     // Inicjalizacja kwadratu dla minimapy (SCREEN)
     glGenVertexArrays(1, &idVAO[SCREEN]);
@@ -512,6 +503,7 @@ void Initialize() {
 }
 
 //swiatla kolorowe
+/*
 void SetupLights() {
     // Światło 1: Białe (krążące - to co już masz)
     lights[0] = { glm::vec3(0, 3, 0), glm::vec3(1.0, 1.0, 1.0), 1.5f };
@@ -522,9 +514,10 @@ void SetupLights() {
     // Światło 4: Niebieskie (stałe)
     lights[3] = { glm::vec3(0, 2, 4), glm::vec3(0.0, 0.0, 1.0), 1.2f };
 }
+*/
 
 void DisplayScene() {
-
+    //logika gracza
     handleInput(keys, myPlayer, scene, meshes, pIdx, playerIdx, playerRadius);
     playerAnimation(keys, myPlayer, scene, pIdx);
 
@@ -549,6 +542,42 @@ void DisplayScene() {
     glm::vec3 lookAtPoint = myPlayer.position + glm::vec3(0.0f, 1.0f, 0.0f);
 
     glm::mat4 matView = glm::lookAt(cameraPos, lookAtPoint, glm::vec3(0.0f, 1.0f, 0.0f));
+
+    // do latarki
+    glm::vec3 viewDir = glm::normalize(lookAtPoint - cameraPos); 
+
+    float cutOff = glm::cos(glm::radians(10.5f));
+    float outerCutOff = glm::cos(glm::radians(15.0f));
+    float offset_latarka = 0.5f;
+    
+    //latarka
+    // --- LOGIKA PRZEŁĄCZANIA ŚWIATŁA ---
+    glUseProgram(idProgram);
+    glUniform1i(glGetUniformLocation(idProgram, "isPointLight"), isPointLight);
+
+    if (isPointLight) {
+        // TRYB LATARKI (Punktowe)
+        // Zamiast vec3(1.0, 1.0, 1.0) daj np. vec3(5.0)
+        glUniform3f(glGetUniformLocation(idProgram, "flashlight.color"), 2.0f, 2.0f, 2.0f);// Świeci
+        glUniform1i(glGetUniformLocation(idProgram, "activeLightsCount"), 0);              // Usuwa stare żarówki z obliczeń
+    } else {
+        // TRYB SŁOŃCA (Kierunkowe)
+        glUniform3f(glGetUniformLocation(idProgram, "flashlight.color"), 0.0f, 0.0f, 0.0f); // Gasi latarkę
+        // activeLightsCount zostaje 0, więc żarówki i tak nie świecą
+    }
+
+    // Ustawienia fizyczne latarki 
+    glm::vec3 flashlightPos = myPlayer.position + (viewDir * offset_latarka);
+
+    glUniform3fv(glGetUniformLocation(idProgram, "flashlight.position"), 1, &flashlightPos[0]);
+    glUniform3fv(glGetUniformLocation(idProgram, "flashlight.direction"), 1, &viewDir[0]);
+
+    // Parametry techniczne 
+    glUniform1f(glGetUniformLocation(idProgram, "flashlight.cutOff"), cutOff);
+    glUniform1f(glGetUniformLocation(idProgram, "flashlight.outerCutOff"), outerCutOff);
+    glUniform1f(glGetUniformLocation(idProgram, "flashlight.constant"), 1.0f);
+    glUniform1f(glGetUniformLocation(idProgram, "flashlight.linear"), 0.09f);
+    glUniform1f(glGetUniformLocation(idProgram, "flashlight.quadratic"), 0.032f);
 
     // 1. Generowanie Mapy Cieni (Tylko głębia)
     if (useShadows) {
@@ -606,26 +635,10 @@ void DisplayScene() {
         }
     }
 
-    if (ImGui::CollapsingHeader("Multi-Light (N)", ImGuiTreeNodeFlags_DefaultOpen)) {
-        ImGui::SliderInt("Active Lights", &activeLightsCount, 1, 4);
-        
-        for (int i = 0; i < activeLightsCount; i++) {
-            ImGui::PushID(i);
-            char buf[32];
-            snprintf(buf, sizeof(buf), "Light %d", i + 1);
-            if (ImGui::TreeNode(buf)) {
-                ImGui::ColorEdit3("Color", glm::value_ptr(lights[i].color));
-                ImGui::SliderFloat("Intensity", &lights[i].intensity, 0.0f, 5.0f);
-                ImGui::TreePop();
-            }
-            ImGui::PopID();
-        }
-    }
-
     ImGui::Text("\nWybierz Skybox:");
     ImGui::RadioButton("Jeden", &currentSkybox, 0);
     ImGui::RadioButton("Dwa", &currentSkybox, 1);
-    ImGui::RadioButton("Dwa", &currentSkybox, 2);
+    ImGui::RadioButton("Trzy", &currentSkybox, 2);
 
     ImGui::Begin("Ustawienia Materialu");
     ImGui::SliderFloat("Sila Normal Mapy", &normalStrength, 0.0f, 5.0f); // Zakres od 0 (płaskie) do 5 (bardzo wypukłe)
@@ -676,7 +689,7 @@ int main() {
     ImGui_ImplOpenGL3_Init("#version 330");
 
     Initialize();
-    SetupLights();
+    //SetupLights();
     setupFBO();
     ShadowMapDir_Init();
 

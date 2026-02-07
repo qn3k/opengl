@@ -1,8 +1,11 @@
 #include "PlayerLogic.hpp"
+#include "maze.hpp"
+#include "player.hpp"
 #include <cmath>
 #include <algorithm>
 #include <iostream>
 
+extern CPlayer myPlayer;
 extern float GetHeight(float x, float z);
 extern void resetGame(std::vector<CMesh>& meshes);
 
@@ -33,10 +36,15 @@ bool checkGlobalCollisions(const glm::vec3& potentialPos, std::vector<SceneObjec
                         break;
 
                     case ColliderType::COLLECTIBLE:
-                        resetGame(meshes);
                         scene[i].isCollected = true;
                         printf("WYGRANA! Zebrano kolibra.\n");
-                        // Przedmiot nie blokuje ruchu
+
+                        // Teleport gracza na początek
+                         myPlayer.position = glm::vec3(2.0f, 1.0f, 2.0f);
+                    
+                        // Regeneracja labiryntu
+                        generateMaze(); 
+                        setupMazeInstancing(meshes); 
                         break;
 
                     case ColliderType::TRIGGER:
@@ -54,11 +62,18 @@ bool checkGlobalCollisions(const glm::vec3& potentialPos, std::vector<SceneObjec
     for (auto& wall : activeColliders) {
         if (wall.isCollision(&playerTest)) {
             
-            // SPRAWDZANIE KOLIBRA:
-            // Jeśli collider jest blisko pozycji kolibra, to jest to nasz cel
-            if (glm::distance(wall.Position, koliberPos) < 0.5f) {
-                resetGame(meshes); // Teraz 'meshes' jest widoczne dzięki argumentowi funkcji
-                return false; // Zwracamy false, żeby nie blokować ruchu w klatce resetu
+            // SPRAWDZANIE KOLIBRA (Trigger zwycięstwa)
+            if (glm::distance(wall.Position, koliberPos) < 1.2f) {
+                printf("ZWYCIESTWO! Dotarto do kolibra.\n");
+                
+                // 1. Resetujemy grę
+                resetGame(meshes); 
+                
+                // 2. Teleportujemy gracza na start (pozycja 1,1 w labiryncie * skala 2.0)
+                myPlayer.position = glm::vec3(2.0f, 0.0f, 2.0f);
+                
+                // Zwracamy true, żeby przerwać ruch w tej klatce (zapobiega utknięciu w nowym labiryncie)
+                return true; 
             }
 
             // SPRAWDZANIE ŚCIAN:

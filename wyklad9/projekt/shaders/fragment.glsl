@@ -21,7 +21,21 @@ struct PointLight {
     float intensity;
 };
 
+struct Flashlight {
+    vec3 position;
+    vec3 direction;
+    float cutOff;      // Cosinus kąta wewnętrznego 
+    float outerCutOff; // Cosinus kąta zewnętrznego (do krawedzi)
+    
+    vec3 color;
+    float constant;
+    float linear;
+    float quadratic;
+};
+
+
 // --- UNIFORMY ---
+uniform Flashlight flashlight;
 uniform PointLight lights[4];
 uniform int activeLightsCount;
 uniform vec3 dirLightDirection;
@@ -69,22 +83,6 @@ vec3 CalcPointLight(PointLight light, vec3 norm, vec3 fragPos, vec3 viewDir, vec
     
     return (ambient + diffuse + specular) * attenuation;
 }
-/*
-float ShadowCalculation(vec4 fragPosLightSpace, vec3 norm, vec3 lightDir) {
-    vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
-    projCoords = projCoords * 0.5 + 0.5;
-    
-    if(projCoords.z > 1.0) return 0.0;
-
-    float closestDepth = texture(tex_shadowMap, projCoords.xy).r; 
-    float currentDepth = projCoords.z;
-
-    // BIAS
-    float bias = max(0.05 * (1.0 - dot(norm, lightDir)), 0.005);
-    float shadow = currentDepth - bias > closestDepth  ? 1.0 : 0.0;
-
-    return shadow;
-}*/
 //wersja 2
 
 float ShadowCalculation(vec4 fragPosLightSpace, vec3 norm, vec3 lightDir) {
@@ -107,6 +105,40 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 norm, vec3 lightDir) {
     // Zwracamy srednią z 25 probek 
     return shadow / 25.0;
 }
+//latarkowe
+vec3 CalcFlashlight(Flashlight light, vec3 norm, vec3 fragPos, vec3 viewDir, vec3 baseColor) {
+    vec3 lightDir = normalize(light.position - fragPos);
+    
+    // Obliczanie kąta świecenia (theta to cosinus kąta między kierunkiem światła a kierunkiem latarki)
+    float theta = dot(lightDir, normalize(-light.direction)); 
+    
+    // Obliczanie wygaszania na krawędziach (soft edges)
+    float epsilon = light.cutOff - light.outerCutOff;
+    float intensity = clamp((theta - light.outerCutOff) / epsilon, 0.0, 1.0);
+    
+    // Obliczanie osłabienia z odległością (attenuation)
+    float distance = length(light.position - fragPos);
+    float attenuation = 1.0 / (light.constant + light.linear * distance + light.quadratic * (distance * distance));    
+
+    // Diffuse
+    float diff = max(dot(norm, lightDir), 0.0);
+    
+    // Specular
+    float spec = 0.0;
+    if(useBlinnPhong) {
+        vec3 halfwayDir = normalize(lightDir + viewDir);
+        spec = pow(max(dot(norm, halfwayDir), 0.0), material.shininess);
+    } else {
+        vec3 reflectDir = reflect(-lightDir, norm);
+        spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
+    }
+
+    vec3 ambient = material.ambient * light.color * baseColor;
+    vec3 diffuse = material.diffuse * diff * light.color * baseColor;
+    vec3 specular = material.specular * spec * light.color;
+
+    return (ambient + (diffuse + specular) * intensity) * attenuation;
+}
 
 void main()
 {
@@ -115,7 +147,7 @@ void main()
         return;
     }
 
-    // --- 1. LOGIKA KOLORU ---
+    // --- 1. LOGIKA KOLORU (ALBEDO) ---
     vec3 albedo;
     float finalAlpha = 1.0;
     vec2 finalUV = TexCoords * uTiling; 
@@ -133,11 +165,9 @@ void main()
     // --- 2. NORMAL MAPPING ---
     vec3 norm;
     if(uUseNormalMap) {
-        // Pobieramy normalną z tekstury i mapujemy z [0,1] na [-1,1]
         norm = texture(uNormalMap, finalUV).rgb;
         norm = normalize(norm * 2.0 - 1.0);
-        norm.xy *= uNormalStrength;; 
-        // Przekształcamy normalną z przestrzeni stycznej do przestrzeni świata
+        norm.xy *= uNormalStrength;
         norm = normalize(TBN * norm);
     } else {
         norm = normalize(Normal);
@@ -145,19 +175,15 @@ void main()
 
     vec3 viewDir = normalize(viewPos - FragPos);
 
-    // --- 3. ODBICIA ---
-    vec3 I = normalize(FragPos - viewPos);
-    vec3 R = reflect(I, norm);
-    vec3 envColor = texture(tex_skybox, R).rgb;
-
-    // --- 4. OŚWIETLENIE ---
+    // --- 3. OŚWIETLENIE ---
     vec3 lightingResult = vec3(0.0);
 
     if(!useLighting) {
         lightingResult = albedo;
     } else {
+        // Obliczamy oświetlenie zależnie od trybu
         if(!isPointLight) {
-            //TRYB KIERUNKOWY
+            // SŁOŃCE (Directional)
             vec3 lightDir = normalize(-dirLightDirection);
             float shadow = ShadowCalculation(FragPosLightSpace, norm, lightDir);
             
@@ -177,20 +203,28 @@ void main()
             }
             lightingResult = ambient + (1.0 - shadow) * (diffuse + (material.specular * spec) * effColor);
         } else {
+            // LATARKA + PUNKTOWE
+            lightingResult += CalcFlashlight(flashlight, norm, FragPos, viewDir, albedo);
             for(int i = 0; i < activeLightsCount; i++) {
                 lightingResult += CalcPointLight(lights[i], norm, FragPos, viewDir, albedo);
             }
         }
     }
 
-    // --- 5. FINALNY MIX ---
-    vec3 finalColor = lightingResult;
-    if(uUseEnvMap && reflectionFactor > 0.0) {
-        finalColor = mix(lightingResult, envColor, reflectionFactor);
+    // --- 4. ENVIRONMENT MAPPING ---
+    if(uUseEnvMap) {
+        vec3 I = normalize(FragPos - viewPos);
+        vec3 R = reflect(I, norm);
+        vec3 envColor = texture(tex_skybox, R).rgb;
+        
+        vec3 reflections = envColor * reflectionFactor;
+        lightingResult = mix(lightingResult, reflections, reflectionFactor);
     }
 
+    // --- 5. MGŁA ---
     float dist = length(viewPos - FragPos);
     float fogFactor = clamp((dist - 60.0) / (120.0 - 60.0), 0.0, 1.0);
     vec3 fogColor = vec3(0.7, 0.75, 0.8); 
-    FragColor = vec4(mix(finalColor, fogColor, fogFactor), finalAlpha);
+    
+    FragColor = vec4(mix(lightingResult, fogColor, fogFactor), finalAlpha);
 }
